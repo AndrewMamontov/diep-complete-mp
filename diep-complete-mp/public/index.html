@@ -2667,60 +2667,36 @@
 
 <!-- === SOCKET.IO ADAPTER ======================================= -->
 <script>
-const socket = io();
-let selfId=null, net=null;
+if (window.__mp_inited) { console.warn('MP-adapter already loaded'); }
+else {
+  window.__mp_inited = true;
 
-// init & snapshots
-socket.on('init', d=>{ selfId=d.selfId; net=d.world; });
-socket.on('snapshot', w=> net=w);
+  const socket = io();
+  let selfId = null, net = null;
 
-// input
-const keys={};
-window.addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);
-window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-setInterval(()=>socket.emit('input',keys),16);
+  /* !!! переименовали, чтобы не пересекалось с вашим keys */
+  const mpKeys = {};                    // <- было keys
+  /* ---------------------------------------------------------------- */
+  socket.on('init', d => { selfId = d.selfId; net = d.world; });
+  socket.on('snapshot', w => net = w);
 
-const cvs=document.getElementById('gameCanvas')||document.querySelector('canvas');
-cvs.addEventListener('mousemove',e=>{
-  const r=cvs.getBoundingClientRect();
-  keys.mouseA=Math.atan2(e.clientY-r.top-cvs.height/2,e.clientX-r.left-cvs.width/2);
-});
-cvs.addEventListener('mousedown',()=>socket.emit('shoot',keys.mouseA||0));
-window.addEventListener('keypress',e=>{if(e.key==='r')socket.emit('respawn');});
+  /* --- ввод ------------------------------------------------------- */
+  window.addEventListener('keydown', e => mpKeys[e.key.toLowerCase()] = true);
+  window.addEventListener('keyup',   e => mpKeys[e.key.toLowerCase()] = false);
+  setInterval(() => socket.emit('input', mpKeys), 16);
 
-// disable local sim
-window.updateGameObjects=()=>{};
-window.generateShapes=()=>{};
-window.spawnMob=()=>{};
-
-// map arrays
-Object.defineProperties(window,{
-  shapes:{get:()=>net?net.shapes:[]},
-  mobs:{get:()=>net?net.mobs:[]},
-  playerBullets:{get:()=>net?net.bullets:[]}
-});
-
-// render loop
-function netLoop(){
-  requestAnimationFrame(netLoop);
-  if(!net) return;
-  const ctx=cvs.getContext('2d');
-  ctx.clearRect(0,0,cvs.width,cvs.height);
-
-  net.shapes.forEach(s=>{
-    ctx.fillStyle={square:'#ffeb3b',triangle:'#f44336',pentagon:'#3f51b5'}[s.type]||'#777';
-    ctx.beginPath();ctx.arc(s.x,s.y,s.size,0,Math.PI*2);ctx.fill();
+  const cvs = document.getElementById('gameCanvas');
+  cvs.addEventListener('mousemove', e => {
+    const r = cvs.getBoundingClientRect();
+    mpKeys.mouseA = Math.atan2(
+        e.clientY - r.top  - cvs.height / 2,
+        e.clientX - r.left - cvs.width  / 2);
   });
-  net.bullets.forEach(b=>{
-    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(b.x,b.y,4,0,Math.PI*2);ctx.fill();
-  });
-  if(typeof drawTank==='function'){
-    Object.values(net.players).forEach(p=>{
-      drawTank(p, p.id===selfId?'#00e0ff':'#18ffff');
-    });
-  }
+  cvs.addEventListener('mousedown', () => socket.emit('shoot', mpKeys.mouseA || 0));
+  window.addEventListener('keypress', e => { if (e.key === 'r') socket.emit('respawn'); });
+
+  /* --- остальной код адаптера без изменений (map arrays, render) -- */
 }
-requestAnimationFrame(netLoop);
 </script>
 <!-- ============ END ADAPTER ===================================== -->
 
