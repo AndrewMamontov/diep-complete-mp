@@ -1,0 +1,2728 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Клієнт Diep.io - AAA Редизайн UI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Define CSS variables for easy theme adjustments */
+            --font-primary: 'Inter', sans-serif;
+            --color-background: #1a1d24; /* Dark background */
+            --color-canvas-bg: #2c313a; /* Slightly lighter canvas bg */
+            --color-canvas-border: #4a4f5a;
+            --color-grid: rgba(255, 255, 255, 0.04);
+            --color-text-primary: #e0e1e6; /* Light text */
+            --color-text-secondary: #a0a3ab; /* Dimmer text */
+            --color-accent-primary: #00e0ff; /* Bright cyan */
+            --color-accent-secondary: #ff4081; /* Pink/Magenta */
+            --color-accent-xp: #ffc107; /* Gold */
+            --color-accent-hp: #4caf50; /* Green */
+            --color-accent-hp-enemy: #ff6347; /* Tomato Red */
+            --color-accent-upgrade: #ff9800; /* Orange */
+            --color-panel-bg: rgba(38, 42, 50, 0.9); /* Semi-transparent dark panel */
+            --color-panel-border: rgba(74, 79, 90, 0.7);
+            --color-shadow-light: rgba(0, 224, 255, 0.1); /* Cyan shadow */
+            --color-shadow-dark: rgba(0, 0, 0, 0.3);
+            --border-radius-small: 6px;
+            --border-radius-medium: 10px;
+            --border-radius-large: 16px;
+            --transition-fast: 0.15s ease-out;
+            --transition-medium: 0.3s ease-out;
+        }
+
+        /* Basic Reset & Body Styles */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--color-background);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: var(--font-primary);
+            color: var(--color-text-primary);
+        }
+
+        /* Canvas Styling */
+        canvas {
+            background-color: var(--color-canvas-bg);
+            display: block;
+            border: 1px solid var(--color-canvas-border);
+            border-radius: var(--border-radius-medium); /* Rounded corners for canvas */
+            box-shadow: 0 0 30px var(--color-shadow-dark), 0 0 15px var(--color-shadow-light) inset; /* Outer and inner shadow */
+            /* Make canvas responsive */
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* Ensure aspect ratio is maintained if needed */
+        }
+
+        /* --- UI Container --- */
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Allow clicks to pass through to canvas */
+            z-index: 10;
+            padding: 20px; /* Add padding around the screen edges */
+            display: grid; /* Use grid for positioning panels */
+            grid-template-columns: auto 1fr auto; /* Left, Center, Right */
+            grid-template-rows: auto 1fr auto; /* Top, Middle, Bottom */
+            gap: 15px; /* Gap between grid areas */
+            /* Ensure grid adapts to smaller screens */
+            /* --- ИЗМЕНЕНО: Явно задаем расположение элементов --- */
+            grid-template-areas:
+                "info . leaderboard" /* Верх: Инфо (слева), Пусто (центр), Лидеры (справа) */
+                ". game ."          /* Середина: Пусто, Игра, Пусто */
+                "upgrades . minimap"; /* Низ: Улучшения (слева), Пусто (центр), Миникарта (справа) */
+        }
+
+        @media (max-width: 768px) { /* Example breakpoint for smaller screens */
+             #ui-container {
+                 padding: 10px;
+                 gap: 10px;
+                 grid-template-columns: 1fr; /* Stack columns */
+                 grid-template-rows: auto auto auto auto 1fr; /* Adjust rows */
+                 /* --- ИЗМЕНЕНО: Обновляем grid-template-areas для мобильных устройств --- */
+                 grid-template-areas: /* Define areas for stacking */
+                    "info"
+                    "leaderboard"
+                    "upgrades"
+                    "minimap"
+                    "game";
+             }
+             .ui-panel { /* Adjust panel width on smaller screens */
+                 width: auto !important; /* Allow panels to take full width */
+                 max-width: 95%; /* Prevent panels from touching edges */
+                 margin: 0 auto; /* Center stacked panels */
+             }
+             /* --- ИЗМЕНЕНО: Убеждаемся, что grid-area соответствует новым областям --- */
+             #game-info { grid-area: info; }
+             #leaderboard { grid-area: leaderboard; max-height: 200px; } /* Reduce leaderboard height */
+             #upgrade-panel { grid-area: upgrades; }
+             #minimap { grid-area: minimap; width: 100px !important; height: 100px !important; } /* Smaller minimap */
+             #class-menu { width: 90% !important; } /* Adjust class menu width */
+             #game-over-screen .game-over-content { padding: 20px 30px; } /* Reduce padding */
+        }
+
+
+        /* Base Panel Style */
+        .ui-panel {
+            background: linear-gradient(145deg, rgba(45, 50, 60, 0.9), rgba(30, 33, 40, 0.92)); /* Subtle gradient */
+            backdrop-filter: blur(8px); /* Frosted glass effect */
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--color-panel-border);
+            border-radius: var(--border-radius-medium);
+            box-shadow: 0 4px 15px var(--color-shadow-dark), 0 0 5px var(--color-shadow-light) inset;
+            padding: 15px;
+            pointer-events: auto; /* Panels should be interactive */
+            transition: transform var(--transition-medium), opacity var(--transition-medium);
+        }
+        .ui-panel h4 { /* Common panel title style */
+             margin: 0 0 15px 0;
+             color: var(--color-accent-primary);
+             font-size: 16px;
+             font-weight: 600;
+             text-align: center;
+             padding-bottom: 8px;
+             border-bottom: 1px solid var(--color-panel-border);
+             text-shadow: 0 0 5px var(--color-shadow-light);
+        }
+
+        /* --- Game Info Panel (Top-Left) --- */
+        #game-info {
+            /* --- ИЗМЕНЕНО: Убеждаемся, что grid-area = info --- */
+            grid-area: info;
+            width: 260px; /* Fixed width */
+        }
+        #game-info .info-line {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: var(--color-text-secondary);
+        }
+        #game-info .info-line svg { /* Icon styling */
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            fill: var(--color-accent-primary);
+            opacity: 0.8;
+            flex-shrink: 0; /* Prevent icons from shrinking */
+        }
+        #game-info .info-line strong {
+            color: var(--color-text-primary);
+            font-weight: 500;
+            margin-right: 5px;
+            min-width: 100px; /* Adjust min-width if needed for Ukrainian labels */
+        }
+        #game-info .info-line span {
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+        #game-info .info-line #level,
+        #game-info .info-line #score,
+        #game-info .info-line #tanks-killed {
+            color: var(--color-accent-xp); /* Highlight key stats */
+        }
+        #game-info .info-line #upgrade-points-info {
+            color: var(--color-accent-upgrade);
+        }
+        #game-info .info-line #auto-fire-status {
+            font-weight: 700;
+        }
+        #game-info .info-line #auto-fire-status.on {
+             color: var(--color-accent-hp); /* Green when ON */
+             text-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+        }
+        #game-info .info-line #auto-fire-status.off {
+             color: var(--color-accent-secondary); /* Red when OFF */
+             text-shadow: 0 0 5px rgba(255, 64, 129, 0.5);
+        }
+        #game-info .tanks-killed-line {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--color-panel-border);
+        }
+        #game-info .tanks-killed-line svg {
+            fill: var(--color-accent-secondary); /* Different icon color */
+        }
+
+        /* --- Upgrade Panel (Bottom-Left) --- */
+        #upgrade-panel {
+            /* --- ИЗМЕНЕНО: Убеждаемся, что grid-area = upgrades --- */
+            grid-area: upgrades;
+            width: 320px; /* Wider panel */
+            position: relative; /* For upgrade points pulse */
+        }
+        #upgrade-panel .stat-item {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto; /* Label, Bar, Value, Button */
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        #upgrade-panel .stat-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--color-text-secondary);
+            white-space: nowrap;
+        }
+        #upgrade-panel .stat-label .keybind {
+            display: inline-block;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 1px 4px;
+            font-size: 11px;
+            margin-right: 5px;
+            color: var(--color-text-primary);
+            min-width: 16px;
+            text-align: center;
+        }
+        /* Modern Progress Bar */
+        #upgrade-panel .stat-bar-container {
+            height: 12px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: var(--border-radius-small);
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.4);
+            position: relative; /* For segmented look */
+        }
+        #upgrade-panel .stat-bar-fill {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-accent-upgrade), #ffd54f); /* Gradient fill */
+            width: 0%;
+            border-radius: var(--border-radius-small);
+            transition: width var(--transition-medium);
+            box-shadow: 0 0 8px rgba(255, 152, 0, 0.5) inset; /* Inner glow */
+        }
+        /* Segmented look (optional) */
+        #upgrade-panel .stat-bar-segments {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+        }
+        #upgrade-panel .stat-bar-segment {
+            flex-grow: 1;
+            border-right: 1px solid rgba(0, 0, 0, 0.3);
+        }
+        #upgrade-panel .stat-bar-segment:last-child {
+            border-right: none;
+        }
+        #upgrade-panel .stat-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-text-primary);
+            text-align: right;
+            min-width: 40px; /* Ensure space for "8 / 8" */
+        }
+        #upgrade-panel .stat-value .current {
+            color: var(--color-accent-upgrade);
+        }
+        /* Modern Upgrade Button */
+        #upgrade-panel .upgrade-button {
+            background: linear-gradient(145deg, #ff9800, #f57c00);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius-small);
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: all var(--transition-fast);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+        }
+        #upgrade-panel .upgrade-button:hover:not(:disabled) {
+            background: linear-gradient(145deg, #ffa726, #fb8c00);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4), 0 0 10px var(--color-accent-upgrade);
+        }
+        #upgrade-panel .upgrade-button:active:not(:disabled) {
+            transform: translateY(0px);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        #upgrade-panel .upgrade-button:disabled {
+            background: linear-gradient(145deg, #6c707a, #4a4f5a); /* Greyed out */
+            cursor: not-allowed;
+            opacity: 0.6;
+            box-shadow: none;
+        }
+        #upgrade-panel .upgrade-points-display { /* Separate display for points */
+            margin-top: 15px;
+            font-weight: 600;
+            color: var(--color-accent-upgrade);
+            text-align: center;
+            font-size: 16px;
+            border-top: 1px solid var(--color-panel-border);
+            padding-top: 10px;
+            text-shadow: 0 0 8px var(--color-accent-upgrade);
+        }
+        /* Pulse effect for available points */
+        #upgrade-panel.has-points::before {
+            content: '';
+            position: absolute;
+            top: -5px; left: -5px; right: -5px; bottom: -5px;
+            border-radius: calc(var(--border-radius-medium) + 5px);
+            border: 2px solid var(--color-accent-upgrade);
+            box-shadow: 0 0 15px var(--color-accent-upgrade);
+            opacity: 0;
+            animation: pulse 1.5s infinite ease-out;
+            pointer-events: none;
+            z-index: -1;
+        }
+        @keyframes pulse {
+            0% { opacity: 0; transform: scale(1); }
+            50% { opacity: 0.7; }
+            100% { opacity: 0; transform: scale(1.05); }
+        }
+
+        /* --- Leaderboard (Top-Right) --- */
+        #leaderboard {
+            /* --- ИЗМЕНЕНО: Убеждаемся, что grid-area = leaderboard --- */
+            grid-area: leaderboard;
+            width: 240px; /* Slightly wider */
+            max-height: 350px; /* Allow more entries */
+            overflow-y: auto;
+            /* Custom scrollbar */
+            scrollbar-width: thin;
+            scrollbar-color: var(--color-accent-primary) rgba(0,0,0,0.2);
+        }
+        #leaderboard::-webkit-scrollbar { width: 6px; }
+        #leaderboard::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
+        #leaderboard::-webkit-scrollbar-thumb { background-color: var(--color-accent-primary); border-radius: 3px; border: 1px solid rgba(0,0,0,0.3); }
+
+        #leaderboard ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #leaderboard li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            font-size: 13px;
+            color: var(--color-text-secondary);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background-color var(--transition-fast);
+            white-space: nowrap;
+        }
+        #leaderboard li:last-child { border-bottom: none; }
+        #leaderboard li:hover { background-color: rgba(255, 255, 255, 0.05); }
+        #leaderboard li .rank {
+            font-weight: 700;
+            color: var(--color-accent-primary);
+            margin-right: 10px;
+            min-width: 20px;
+            text-align: right;
+        }
+        #leaderboard li .name {
+            font-weight: 500;
+            color: var(--color-text-primary);
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 10px;
+        }
+        #leaderboard li .score {
+            font-weight: 600;
+            color: var(--color-accent-xp);
+        }
+        /* Highlight player */
+        #leaderboard li.player-leader {
+            background-color: rgba(0, 224, 255, 0.1);
+            border-left: 3px solid var(--color-accent-primary);
+            padding-left: 10px;
+        }
+        #leaderboard li.player-leader .name { color: var(--color-accent-primary); font-weight: 700; }
+        /* Style for mobs */
+        #leaderboard li.mob-leader .name { color: var(--color-accent-secondary); }
+        #leaderboard li.mob-leader .score { color: var(--color-accent-secondary); opacity: 0.8; }
+
+        /* --- Minimap (Bottom-Right) --- */
+        #minimap {
+            /* --- ИЗМЕНЕНО: Убеждаемся, что grid-area = minimap --- */
+            grid-area: minimap;
+            width: 150px; /* Slightly larger */
+            height: 150px;
+            position: relative; /* For elements inside */
+            overflow: hidden; /* Clip contents */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            background: rgba(30, 33, 40, 0.8); /* Darker background for contrast */
+        }
+        /* Add a simple representation */
+        #minimap::after {
+            content: 'Мінікарта';
+            position: absolute;
+            /* Basic placeholder - actual minimap requires JS drawing */
+        }
+
+        /* --- Class Menu (Center Modal) --- */
+        #class-menu-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(10, 12, 15, 0.7); /* Darker overlay */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity var(--transition-medium), visibility var(--transition-medium);
+            pointer-events: none;
+        }
+        #class-menu-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+        #class-menu {
+             /* Inherits .ui-panel styles */
+            width: 450px;
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform var(--transition-medium);
+        }
+        #class-menu-overlay.visible #class-menu {
+            transform: scale(1);
+        }
+        #class-menu h3 { /* Overrides .ui-panel h4 */
+            margin: 0 0 25px 0;
+            color: var(--color-accent-secondary); /* Use secondary accent */
+            font-size: 24px;
+            font-weight: 700;
+            text-shadow: 0 0 8px var(--color-accent-secondary);
+            border-bottom: 1px solid var(--color-panel-border);
+            padding-bottom: 15px;
+        }
+        #class-menu .class-options-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* 2 columns */
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        #class-menu .class-option {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--border-radius-medium);
+            padding: 15px;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            text-align: center;
+        }
+        #class-menu .class-option:hover {
+            background-color: rgba(0, 224, 255, 0.15);
+            border-color: var(--color-accent-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3), 0 0 8px var(--color-shadow-light);
+        }
+        #class-menu .class-option svg { /* Class Icon Placeholder */
+            width: 40px;
+            height: 40px;
+            margin-bottom: 10px;
+            fill: var(--color-accent-primary);
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #class-menu .class-name {
+            display: block;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-bottom: 5px;
+        }
+        #class-menu .class-keybind {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+        }
+        #class-menu .instructions {
+            margin-top: 25px;
+            font-size: 13px;
+            color: var(--color-text-secondary);
+            opacity: 0.8;
+        }
+
+        /* --- Level Up Notification (Center) --- */
+        #level-up-notification {
+            position: absolute;
+            top: 30%; /* Position higher */
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8); /* Start smaller */
+            background: linear-gradient(145deg, var(--color-accent-xp), #ffeb3b);
+            color: #1a1d24; /* Dark text on light background */
+            padding: 15px 35px;
+            border-radius: var(--border-radius-large);
+            font-size: 24px;
+            font-weight: 700;
+            z-index: 40;
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bounce effect */
+            pointer-events: none;
+            box-shadow: 0 5px 20px rgba(255, 193, 7, 0.4);
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.1);
+        }
+        #level-up-notification.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* --- Game Over Screen (Full Overlay) --- */
+        #game-over-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(10, 12, 15, 0.85); /* Darker overlay */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: var(--color-text-primary);
+            display: flex; /* Use flex */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            opacity: 0; /* Start hidden */
+            visibility: hidden;
+            transition: opacity var(--transition-medium), visibility var(--transition-medium);
+            pointer-events: none;
+            text-align: center;
+        }
+        #game-over-screen.visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+        #game-over-screen .game-over-content { /* Inner container for animation */
+             background: linear-gradient(145deg, rgba(45, 50, 60, 0.9), rgba(30, 33, 40, 0.92));
+             border: 1px solid var(--color-panel-border);
+             border-radius: var(--border-radius-large);
+             box-shadow: 0 6px 25px var(--color-shadow-dark), 0 0 8px var(--color-shadow-light) inset;
+             padding: 40px 60px;
+             transform: scale(0.9);
+             transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bounce in */
+        }
+        #game-over-screen.visible .game-over-content {
+            transform: scale(1);
+        }
+
+        #game-over-screen h2 {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--color-accent-secondary); /* Red for Game Over */
+            margin-bottom: 30px;
+            text-shadow: 0 0 15px var(--color-accent-secondary);
+        }
+        #game-over-screen .stats {
+            font-size: 18px;
+            margin-bottom: 40px;
+            color: var(--color-text-secondary);
+        }
+        #game-over-screen .stats div {
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between; /* Align label and value */
+            padding-bottom: 5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 250px; /* Ensure enough width for labels */
+        }
+        #game-over-screen .stats span {
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-left: 15px;
+        }
+         #game-over-screen .stats .label {
+             opacity: 0.8;
+             text-align: left; /* Align labels left */
+             flex-grow: 1; /* Allow label to take space */
+         }
+        #game-over-screen .stats #final-score,
+        #game-over-screen .stats #final-tanks-killed {
+            color: var(--color-accent-xp); /* Highlight score */
+        }
+        #game-over-screen .final-tanks-killed span {
+             color: var(--color-accent-secondary); /* Highlight kills */
+        }
+
+        /* Modern Restart Button */
+        #game-over-screen button#restart-button {
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: 600;
+            background: linear-gradient(145deg, var(--color-accent-primary), #00b8d4);
+            color: var(--color-background);
+            border: none;
+            border-radius: var(--border-radius-medium);
+            cursor: pointer;
+            transition: all var(--transition-medium);
+            box-shadow: 0 4px 15px rgba(0, 224, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #game-over-screen button#restart-button:hover {
+            background: linear-gradient(145deg, #18ffff, #00e0ff);
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 6px 20px rgba(0, 224, 255, 0.5);
+        }
+        #game-over-screen button#restart-button:active {
+            transform: translateY(0px) scale(1);
+            box-shadow: 0 2px 10px rgba(0, 224, 255, 0.3);
+        }
+
+        /* --- Tank & Object Styles (In-Game) --- */
+        /* These will be drawn by Canvas, but CSS can influence associated UI like HP bars */
+        .hp-bar-container { /* Example hypothetical class if HP bars were DOM elements */
+            position: absolute;
+            /* ... */
+            height: 6px;
+            background-color: rgba(0,0,0,0.5);
+            border-radius: 3px;
+            border: 1px solid rgba(0,0,0,0.7);
+            overflow: hidden;
+        }
+        .hp-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width var(--transition-fast);
+        }
+        .hp-bar-fill.player { background: linear-gradient(90deg, #4caf50, #81c784); }
+        .hp-bar-fill.enemy { background: linear-gradient(90deg, #f44336, #e57373); }
+        .hp-bar-fill.shape { background: linear-gradient(90deg, #ffeb3b, #fff176); }
+
+        .xp-bar-container {
+            height: 6px;
+            background-color: rgba(0,0,0,0.5);
+            border-radius: 3px;
+            border: 1px solid rgba(0,0,0,0.7);
+            overflow: hidden;
+        }
+        .xp-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-accent-xp), #ffd54f);
+            border-radius: 3px;
+            transition: width var(--transition-medium); /* Slower transition for XP */
+        }
+
+        .player-name-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-text-primary);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+        }
+
+        /* --- Utility --- */
+        .hidden {
+            display: none !important; /* Force hide */
+        }
+
+    </style>
+<script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-container">
+        <div id="game-info" class="ui-panel">
+            </div>
+
+        <div id="leaderboard" class="ui-panel">
+            <h4>ЛІДЕРИ</h4>
+            <ul id="leaderboard-list">
+                </ul>
+        </div>
+
+        <div id="upgrade-panel" class="ui-panel">
+            </div>
+
+        <div id="minimap" class="ui-panel">
+            </div>
+
+        <div id="level-up-notification">
+            Рівень підвищено! +<span id="level-up-points">1</span> очко покращення
+        </div>
+
+    </div>
+
+    <div id="class-menu-overlay">
+        <div id="class-menu" class="ui-panel">
+            <h3>ОБЕРІТЬ КЛАС</h3>
+            <div class="class-options-grid">
+                <div class="class-option" data-class="Twin">
+                    <svg viewBox="0 0 100 100"><rect x="20" y="20" width="60" height="60" rx="10" stroke="currentColor" stroke-width="5" fill="none"/><rect x="45" y="5" width="10" height="30" rx="5" fill="currentColor"/><rect x="45" y="65" width="10" height="30" rx="5" fill="currentColor"/></svg>
+                    <span class="class-name">Twin</span>
+                    <span class="class-keybind">(Клавіша 2)</span>
+                </div>
+                 <div class="class-option" data-class="Sniper">
+                     <svg viewBox="0 0 100 100"><polygon points="50,15 85,85 15,85" stroke="currentColor" stroke-width="5" fill="none"/><rect x="45" y="5" width="10" height="40" rx="5" fill="currentColor"/></svg>
+                    <span class="class-name">Sniper</span>
+                    <span class="class-keybind">(Клавіша 3)</span>
+                </div>
+                 <div class="class-option" data-class="Machine Gun">
+                     <svg viewBox="0 0 100 100"><polygon points="50,10 90,40 75,90 25,90 10,40" stroke="currentColor" stroke-width="5" fill="none"/><rect x="40" y="5" width="20" height="25" rx="8" fill="currentColor"/></svg>
+                    <span class="class-name">Machine Gun</span>
+                    <span class="class-keybind">(Клавіша 4)</span>
+                </div>
+                 <div class="class-option" data-class="Flank Guard">
+                    <svg viewBox="0 0 100 100"><polygon points="50,10 90,50 50,90 10,50" stroke="currentColor" stroke-width="5" fill="none"/><rect x="5" y="45" width="30" height="10" rx="5" fill="currentColor"/><rect x="65" y="45" width="30" height="10" rx="5" fill="currentColor"/></svg>
+                    <span class="class-name">Flank Guard</span>
+                    <span class="class-keybind">(Клавіша 5)</span>
+                </div>
+            </div>
+            <div class="instructions">
+                Натисніть відповідну цифру або клацніть по іконці класу.
+            </div>
+        </div>
+    </div>
+
+    <div id="game-over-screen">
+        <div class="game-over-content">
+            <h2>ГРУ ЗАВЕРШЕНО!</h2>
+            <div class="stats">
+                <div><span class="label">Ваш рівень:</span> <span id="final-level"></span></div>
+                <div><span class="label">Ваш клас:</span> <span id="final-class"></span></div>
+                <div><span class="label">Набрано досвіду:</span> <span id="final-experience"></span></div>
+                <div><span class="label">Ваш рахунок:</span> <span id="final-score"></span></div>
+                <div class="final-tanks-killed"><span class="label">Вбито танків:</span> <span id="final-tanks-killed"></span></div>
+            </div>
+            <button id="restart-button">Почати знову</button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DOM Element References ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Panels
+        const uiContainer = document.getElementById('ui-container');
+        const gameInfoPanel = document.getElementById('game-info');
+        const upgradePanel = document.getElementById('upgrade-panel');
+        const leaderboardPanel = document.getElementById('leaderboard');
+        const leaderboardList = document.getElementById('leaderboard-list');
+        const minimapPanel = document.getElementById('minimap');
+
+        // Class Menu
+        const classMenuOverlay = document.getElementById('class-menu-overlay');
+        const classMenu = document.getElementById('class-menu');
+        const classOptions = document.querySelectorAll('#class-menu .class-option');
+
+        // Notifications & Overlays
+        const levelUpNotification = document.getElementById('level-up-notification');
+        const levelUpPointsSpan = document.getElementById('level-up-points');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const restartButton = document.getElementById('restart-button');
+
+        // Dynamic UI Spans (will be populated/updated)
+        let levelSpan, classSpan, experienceSpan, expToLevelSpan, upgradePointsInfoSpan, scoreSpan, tanksKilledSpan, autoFireStatusSpan;
+        let finalLevelSpan, finalClassSpan, finalExperienceSpan, finalScoreSpan, finalTanksKilledSpan;
+        let upgradePointsPanelInnerSpan, upgradePointsPanelBottomSpan;
+
+        // --- Game Constants & Settings ---
+        const playerTankSize = 30;
+        const baseBarrelLength = 25;
+        const baseBarrelWidth = 10;
+        const twinBarrelOffset = 8;
+        const flankGuardBarrelOffset = 8; // Note: Flank Guard now uses barrel angle, offset might be less relevant
+        const SPEED_MULTIPLIER = 2.5; // Adjusted speed multiplier
+        const initialShapeCount = 60; // More shapes
+        const baseShapeSize = 20;
+        const MAX_MOBS = 7; // Slightly more mobs
+        const MOB_RESPAWN_DELAY = 7000;
+        const mobSize = 25;
+        const MOB_XP_MULTIPLIER = 5;
+        const MOB_BASE_XP_VALUE = 50;
+        const MOB_MAX_LEVEL = 25; // Increased mob max level
+        const MOB_SHOT_XP_GAIN = 0.2; // **NEW**: XP gain per shot for mobs
+
+        // --- Game State Variables ---
+        let playerTank; // Will be initialized in restartGame
+        const keys = { w: false, a: false, s: false, d: false, arrowUp: false, arrowLeft: false, arrowDown: false, arrowRight: false, mouseDown: false };
+        let mouseX = 0, mouseY = 0;
+        let playerBullets = [];
+        let mobBullets = [];
+        let shapes = [];
+        let mobs = [];
+        let explosions = [];
+        let isClassMenuOpen = false;
+        let lastTime = 0;
+        let accumulatedTime = 0;
+        const timeStep = 1000 / 60; // Fixed timestep for physics
+
+        // --- Shape & Class Definitions ---
+        const shapeTypes = {
+            square: { color: '#ffeb3b', outline: '#c0b02a', health: 20, exp: 10, sizes: [14, 20, 26], expMultipliers: [1, 2, 3], bodyDamage: 10, drawFunc: drawSquare },
+            triangle: { color: '#f44336', outline: '#c0352a', health: 30, exp: 15, sizes: [24], bodyDamage: 15, drawFunc: drawTriangle },
+            pentagon: { color: '#3f51b5', outline: '#303f9f', health: 50, exp: 25, sizes: [28, 32, 36], expMultipliers: [1, 2, 3], bodyDamage: 20, drawFunc: drawPentagon }
+        };
+
+        // --- Класи танків (з українськими назвами для UI, але англійськими ID) ---
+        const CLASSES = {
+            "Базовий": { name: "Базовий", barrels: [{ length: 25, width: 10, angle: 0, offset: 0 }], firePattern: "single", bulletSpeedMultiplier: 1, reloadMultiplier: 1 },
+            "Twin": { name: "Twin", barrels: [{ length: 25, width: 10, angle: 0, offset: -twinBarrelOffset }, { length: 25, width: 10, angle: 0, offset: twinBarrelOffset }], firePattern: "dual", bulletSpeedMultiplier: 1, reloadMultiplier: 1.2 },
+            "Sniper": { name: "Sniper", barrels: [{ length: 40, width: 7, angle: 0, offset: 0 }], firePattern: "single", bulletSpeedMultiplier: 1.8, reloadMultiplier: 1.5 },
+            "Machine Gun": { name: "Machine Gun", barrels: [{ length: 20, width: 15, angle: 0, offset: 0 }], firePattern: "single", bulletSpeedMultiplier: 0.8, reloadMultiplier: 0.5 },
+            "Flank Guard": { name: "Flank Guard", barrels: [{ length: 25, width: 10, angle: 0, offset: 0 }, { length: 25, width: 10, angle: Math.PI, offset: 0 }], firePattern: "frontAndBack", bulletSpeedMultiplier: 1, reloadMultiplier: 1 }
+            // Add more classes here if needed
+        };
+
+        // Initial player state structure
+        const initialPlayerState = {
+            position: { x: 0, y: 0 }, // Initialized in restartGame
+            velocity: { x: 0, y: 0 },
+            rotation: 0,
+            turretAngle: 0,
+            baseMaxHp: 100, currentHp: 100, maxHp: 100,
+            baseRegenRate: 0.015, regenRate: 0.015, // Slightly increased base regen
+            baseBodyDamage: 5, bodyDamage: 5,
+            baseBulletDamage: 10, bulletDamage: 10,
+            baseBulletSpeed: 5, bulletSpeed: 5,
+            baseBulletPenetration: 1, bulletPenetration: 1,
+            baseShootCooldown: 200, shootCooldown: 200,
+            baseMovementSpeed: { acc: 0.2 * SPEED_MULTIPLIER, max: 3 * SPEED_MULTIPLIER },
+            movementSpeed: { acc: 0.2 * SPEED_MULTIPLIER, max: 3 * SPEED_MULTIPLIER },
+            friction: 0.88, // Slightly increased friction for tighter control
+            class: "Базовий", // Змінено на українську назву
+            level: 1,
+            xp: 0, currentVisibleXP: 0, xpToNextLevel: 100,
+            upgradePoints: 1, score: 0, tanksKilled: 0,
+            name: "Гравець", // Змінено на українську назву
+            upgrades: { regen: 0, maxHealth: 0, bodyDamage: 0, bulletSpeed: 0, penetration: 0, damage: 0, reload: 0, moveSpeed: 0 },
+            maxStatLevel: 8, maxLevel: 45,
+            autoShoot: false, lastShootTime: 0, lastRegenTime: 0, lastHitTime: 0,
+            recoil: 0, recoilAmount: 4, recoilSpeed: 0.015, // Slightly adjusted recoil
+            upgradePulseTimer: 0, upgradePulseDuration: 1500, // Longer pulse
+            levelUpFlashTimer: 0, levelUpFlashDuration: 600,
+            isDead: false,
+            selectedClass: null // Track if a class has been chosen at level milestones
+        };
+
+        // --- Utility Functions ---
+        function lerp(start, end, t) { return start * (1 - t) + end * t; }
+        function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+        // Helper to convert hex color to rgb string for rgba() - with error handling
+        function hexToRgb(hex) {
+            if (!hex || typeof hex !== 'string') return '255,255,255'; // Default white on error
+            hex = hex.replace('#', '');
+            if (hex.length !== 6 && hex.length !== 3) return '255,255,255'; // Basic validation
+
+            // Handle shorthand hex (e.g., "03F")
+            if (hex.length === 3) {
+                hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+            }
+
+            const bigint = parseInt(hex, 16);
+            // Check if parsing failed (NaN)
+            if (isNaN(bigint)) return '255,255,255';
+
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            return `${r},${g},${b}`; // Return comma-separated string
+        }
+
+
+        // --- UI Update Functions ---
+
+        // Create the structure for the info panel
+        function setupInfoPanel() {
+            if (!gameInfoPanel) return;
+            // --- Створення структури панелі інформації ---
+            gameInfoPanel.innerHTML = `
+                 <div class="info-line">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+                    <strong>Клас:</strong> <span id="class">${playerTank?.class || 'Базовий'}</span>
+                </div>
+                <div class="info-line">
+                    <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                    <strong>Рівень:</strong> <span id="level">${playerTank?.level || 1}</span>
+                </div>
+                <div class="info-line">
+                    <svg viewBox="0 0 24 24"><path d="M21 11.5c0-1.84-1.46-3.34-3.3-3.48V3h-2v5.02c-1.84.14-3.3 1.64-3.3 3.48s1.46 3.34 3.3 3.48V21h2v-5.02c1.84-.14 3.3-1.64 3.3-3.48zm-5.6 0c0-.99.81-1.8 1.8-1.8s1.8.81 1.8 1.8-.81 1.8-1.8 1.8-1.8-.81-1.8-1.8zM4 5h8v2H4zm0 6h8v2H4zm0 6h8v2H4z"/></svg>
+                    <strong>Досвід:</strong> <span id="experience">${playerTank ? Math.floor(playerTank.currentVisibleXP) : 0}</span> / <span id="exp-to-level">${playerTank?.xpToNextLevel === Infinity ? 'МАКС' : (playerTank?.xpToNextLevel || 100)}</span>
+                </div>
+                 <div class="info-line">
+                    <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2zm0 0z"/></svg> <strong>Рахунок:</strong> <span id="score">${playerTank?.score || 0}</span>
+                </div>
+                <div class="info-line">
+                     <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 16H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h12c.55 0 1 .45 1 1v12c0 .55-.45 1-1 1zm-5-6l-4 4h8z M7 8h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z"/></svg> <strong>Покращення:</strong> <span id="upgrade-points-info">${playerTank?.upgradePoints || 0}</span>
+                </div>
+                <div class="info-line">
+                    <svg viewBox="0 0 24 24"><path d="M17 4h-3V2h-4v2H7v2h10V4zm0 4H7v2h10V8zm-5 4h-2v2H8v2h2v-2h2v2h2v-2h-2v-2zm5 0H7v2h10v-2z"/></svg> <strong>Авто-вогонь [E]:</strong> <span id="auto-fire-status" class="${playerTank?.autoShoot ? 'on' : 'off'}">${playerTank?.autoShoot ? 'УВІМК' : 'ВИМК'}</span>
+                </div>
+                <div class="info-line tanks-killed-line">
+                    <svg viewBox="0 0 24 24"><path d="M12 4c-4.41 0-8 3.59-8 8s3.59 8 8 8 8-3.59 8-8-3.59-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm-1.41-7.41L9 12l1.59 1.59L12 12.17l1.41 1.42L15 12l-1.59-1.59L12 11.83z"/></svg> <strong>Вбито танків:</strong> <span id="tanks-killed">${playerTank?.tanksKilled || 0}</span>
+                </div>`;
+            // Assign spans after innerHTML is set
+            levelSpan = document.getElementById('level');
+            classSpan = document.getElementById('class');
+            experienceSpan = document.getElementById('experience');
+            expToLevelSpan = document.getElementById('exp-to-level');
+            upgradePointsInfoSpan = document.getElementById('upgrade-points-info');
+            scoreSpan = document.getElementById('score');
+            tanksKilledSpan = document.getElementById('tanks-killed');
+            autoFireStatusSpan = document.getElementById('auto-fire-status');
+        }
+
+        // Create the structure for the upgrade panel
+        function setupUpgradePanel() {
+            if (!upgradePanel || !playerTank) return; // Added check for playerTank
+            // --- Створення структури панелі покращень ---
+            const statsList = [
+                { id: 'regen', name: 'Реген. HP', key: '1' }, { id: 'maxHealth', name: 'Макс. HP', key: '2' },
+                { id: 'bodyDamage', name: 'Шкода тілом', key: '3' }, { id: 'bulletSpeed', name: 'Швидк. куль', key: '4' }, // Скорочено для кращого вигляду
+                { id: 'penetration', name: 'Пробиття', key: '5' }, { id: 'damage', name: 'Шкода куль', key: '6' },
+                { id: 'reload', name: 'Перезарядка', key: '7' }, { id: 'moveSpeed', name: 'Швидкість', key: '8' }
+            ];
+
+            let htmlContent = `<h4>
+                                <svg viewBox="0 0 24 24" width="18" height="18" style="vertical-align: middle; margin-right: 5px; fill: currentColor;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                ПОКРАЩЕННЯ (<span id="upgrade-points-panel-inner">${playerTank.upgradePoints}</span>)
+                               </h4>`;
+            let segmentsHtml = '';
+            // Check playerTank exists before accessing maxStatLevel
+            const maxStatLevel = playerTank?.maxStatLevel || 8; // Default to 8 if playerTank is not ready
+            for (let i = 0; i < maxStatLevel; i++) {
+                segmentsHtml += '<div class="stat-bar-segment"></div>';
+            }
+
+            statsList.forEach(stat => {
+                htmlContent += `
+                    <div class="stat-item">
+                        <span class="stat-label"><span class="keybind">${stat.key}</span>${stat.name}</span>
+                        <div class="stat-bar-container">
+                            <div class="stat-bar-segments">${segmentsHtml}</div>
+                            <div id="stat-${stat.id}" class="stat-bar-fill" style="width: 0%;"></div>
+                        </div>
+                        <span id="stat-${stat.id}-value" class="stat-value"><span class="current">0</span> / ${maxStatLevel}</span>
+                        <button class="upgrade-button" data-stat="${stat.id}" data-key="${stat.key}" disabled>+</button>
+                    </div>`;
+            });
+            htmlContent += `<div class="upgrade-points-display">Очок доступно: <span id="upgrade-points-panel-bottom">${playerTank.upgradePoints}</span></div>`;
+            upgradePanel.innerHTML = htmlContent;
+
+            upgradePanel.querySelectorAll('.upgrade-button').forEach(button => {
+                button.addEventListener('click', () => applyUpgrade(button.getAttribute('data-stat')));
+            });
+
+            upgradePointsPanelInnerSpan = document.getElementById('upgrade-points-panel-inner');
+            upgradePointsPanelBottomSpan = document.getElementById('upgrade-points-panel-bottom');
+
+            // Update UI immediately after setup
+            updateUpgradePanelUI();
+        }
+
+        // Update only the upgrade panel elements
+        function updateUpgradePanelUI() {
+            if (!playerTank || !upgradePanel) return; // Ensure playerTank and panel exist
+
+            const points = playerTank.upgradePoints;
+            if (upgradePointsPanelInnerSpan) upgradePointsPanelInnerSpan.innerText = points;
+            if (upgradePointsPanelBottomSpan) upgradePointsPanelBottomSpan.innerText = points;
+
+            // Add/Remove pulse class based on points
+            if (points > 0) {
+                upgradePanel.classList.add('has-points');
+            } else {
+                upgradePanel.classList.remove('has-points');
+            }
+
+            const statNames = ['regen', 'maxHealth', 'bodyDamage', 'bulletSpeed', 'penetration', 'damage', 'reload', 'moveSpeed'];
+            statNames.forEach(stat => {
+                const value = playerTank.upgrades[stat];
+                const fillElement = document.getElementById(`stat-${stat}`);
+                const valueElement = document.getElementById(`stat-${stat}-value`);
+                const button = upgradePanel.querySelector(`.upgrade-button[data-stat="${stat}"]`);
+
+                if (fillElement) {
+                    fillElement.style.width = `${(value / playerTank.maxStatLevel) * 100}%`;
+                }
+                if (valueElement) {
+                    valueElement.innerHTML = `<span class="current">${value}</span> / ${playerTank.maxStatLevel}`;
+                }
+                if (button) {
+                    button.disabled = !(points > 0 && value < playerTank.maxStatLevel);
+                }
+            });
+        }
+
+        // Update the main game info panel
+        function updateGameInfoUI() {
+            if (!playerTank || !gameInfoPanel) return;
+
+            if (levelSpan) levelSpan.innerText = playerTank.level;
+            if (classSpan) classSpan.innerText = playerTank.class; // Відображаємо українську назву класу
+            if (experienceSpan) experienceSpan.innerText = Math.floor(playerTank.currentVisibleXP); // Use smoothed XP
+            if (expToLevelSpan) expToLevelSpan.innerText = playerTank.xpToNextLevel === Infinity ? 'МАКС' : playerTank.xpToNextLevel;
+            if (scoreSpan) scoreSpan.innerText = playerTank.score;
+            if (tanksKilledSpan) tanksKilledSpan.innerText = playerTank.tanksKilled;
+            if (upgradePointsInfoSpan) upgradePointsInfoSpan.innerText = playerTank.upgradePoints;
+            if (autoFireStatusSpan) {
+                autoFireStatusSpan.innerText = playerTank.autoShoot ? 'УВІМК' : 'ВИМК';
+                autoFireStatusSpan.className = playerTank.autoShoot ? 'on' : 'off';
+            }
+        }
+
+        // Update the leaderboard
+        function updateLeaderboard() {
+            if (!leaderboardList || !playerTank) return;
+
+            let leaders = [];
+            if (!playerTank.isDead) {
+                leaders.push({ name: playerTank.name, score: playerTank.score, isMob: false, isPlayer: true });
+            }
+            mobs.forEach(mob => {
+                // Використовуємо "Моб" замість "Mob" та "Р" замість "L"
+                leaders.push({ name: `Моб ${mob.id.toString().slice(-4)} Р${mob.level}`, score: mob.score, isMob: true, isPlayer: false });
+            });
+
+            leaders.sort((a, b) => b.score - a.score);
+
+            leaderboardList.innerHTML = ''; // Clear old list
+
+            const maxLeadersToShow = 10;
+            leaders.slice(0, maxLeadersToShow).forEach((leader, index) => {
+                const li = document.createElement('li');
+                li.classList.toggle('mob-leader', leader.isMob);
+                li.classList.toggle('player-leader', leader.isPlayer);
+                li.innerHTML = `
+                    <span class="rank">${index + 1}.</span>
+                    <span class="name">${leader.name}</span>
+                    <span class="score">${leader.score}</span>`;
+                leaderboardList.appendChild(li);
+            });
+        }
+
+        // Update all UI elements
+        function updateUI() {
+            updateGameInfoUI();
+            updateUpgradePanelUI();
+            updateLeaderboard();
+        }
+
+        // --- Core Game Logic Functions ---
+
+        function applyStatEffects() {
+            if (!playerTank) return;
+            const upgrades = playerTank.upgrades;
+            const base = initialPlayerState;
+            // Apply stat calculations based on upgrade levels
+            playerTank.regenRate = base.baseRegenRate * Math.pow(1.4, upgrades.regen);
+            playerTank.maxHp = base.baseMaxHp + upgrades.maxHealth * 25;
+            playerTank.bodyDamage = base.baseBodyDamage + upgrades.bodyDamage * 4;
+            playerTank.bulletSpeed = base.baseBulletSpeed * (1 + upgrades.bulletSpeed * 0.12);
+            playerTank.bulletPenetration = base.baseBulletPenetration + upgrades.penetration * 0.6;
+            playerTank.bulletDamage = base.baseBulletDamage + upgrades.damage * 4;
+            const reloadReductionFactor = 0.11;
+            playerTank.shootCooldown = Math.max(35, base.baseShootCooldown * (1 - upgrades.reload * reloadReductionFactor));
+            playerTank.movementSpeed.acc = base.baseMovementSpeed.acc * (1 + upgrades.moveSpeed * 0.12);
+            playerTank.movementSpeed.max = base.baseMovementSpeed.max + upgrades.moveSpeed * 0.6 * SPEED_MULTIPLIER;
+
+            // Apply class modifiers
+            const currentClassConfig = CLASSES[playerTank.class]; // Використовуємо українську назву класу для пошуку
+            if (currentClassConfig) {
+                playerTank.bulletSpeed *= currentClassConfig.bulletSpeedMultiplier || 1;
+                playerTank.shootCooldown /= currentClassConfig.reloadMultiplier || 1;
+                playerTank.shootCooldown = Math.max(35, playerTank.shootCooldown);
+            }
+            // Ensure current HP doesn't exceed new max HP
+            playerTank.currentHp = Math.min(playerTank.currentHp, playerTank.maxHp);
+        }
+
+        function calculateNextXP(level, isMob = false) {
+            const maxLevel = isMob ? MOB_MAX_LEVEL : playerTank.maxLevel;
+            if (level >= maxLevel) return Infinity;
+            if (isMob) {
+                return 60 + level * 25;
+            } else {
+                return Math.floor(80 * Math.pow(1.18, level - 1));
+            }
+        }
+
+        function gainExperience(amount) {
+            if (!playerTank || playerTank.level >= playerTank.maxLevel || playerTank.isDead) return;
+            playerTank.xp += amount;
+            playerTank.score += Math.round(amount);
+
+            while (playerTank.level < playerTank.maxLevel && playerTank.xp >= playerTank.xpToNextLevel) {
+                playerTank.xp -= playerTank.xpToNextLevel;
+                playerTank.level++;
+                let pointsGained = 1;
+                playerTank.upgradePoints += pointsGained;
+                playerTank.xpToNextLevel = calculateNextXP(playerTank.level);
+                console.log(`Гравець підвищив рівень: ${playerTank.level}! Очки покращення: ${playerTank.upgradePoints}`);
+                showLevelUpNotification(pointsGained);
+                playerTank.upgradePulseTimer = playerTank.upgradePulseDuration;
+                playerTank.levelUpFlashTimer = playerTank.levelUpFlashDuration;
+
+                // Show class menu at levels 15 and 30 if no class selected yet for that tier
+                if ((playerTank.level === 15 || playerTank.level === 30) && !playerTank.selectedClass) {
+                    showClassMenu();
+                }
+            }
+            updateUI(); // Update UI after potential level up
+        }
+
+        function gainMobExperience(mob, amount) {
+            if (!mob || mob.level >= MOB_MAX_LEVEL) return;
+            mob.xp += amount;
+            mob.score += Math.round(amount);
+
+            while (mob.level < MOB_MAX_LEVEL && mob.xp >= mob.xpToNextLevel) {
+                mob.xp -= mob.xpToNextLevel;
+                mob.level++;
+                mob.xpToNextLevel = calculateNextXP(mob.level, true);
+                // Improve mob stats on level up
+                mob.maxHp += 20;
+                mob.currentHp = mob.maxHp; // Heal on level up
+                mob.bulletDamage += 1.5;
+                mob.movementSpeed.max += 0.25 * SPEED_MULTIPLIER;
+                mob.shootCooldown = Math.max(100, mob.shootCooldown * 0.93);
+                console.log(`Моб ${mob.id.toString().slice(-4)} підвищив рівень: ${mob.level}`);
+            }
+            updateLeaderboard(); // Update leaderboard as mob score/level changed
+        }
+
+        function showLevelUpNotification(pointsGained) {
+            if (!levelUpNotification || !levelUpPointsSpan) return;
+            levelUpPointsSpan.innerText = pointsGained;
+            levelUpNotification.classList.add('show');
+            // Automatically hide after a delay
+            setTimeout(() => {
+                levelUpNotification.classList.remove('show');
+            }, 2500);
+        }
+
+        function regenerateHealth() {
+            if (!playerTank || playerTank.isDead) return;
+            const now = Date.now();
+            const elapsed = now - (playerTank.lastRegenTime || now);
+            const timeSinceLastHit = now - playerTank.lastHitTime;
+
+            // Regenerate only if not recently hit (3 seconds delay)
+            if (timeSinceLastHit > 3000 && playerTank.currentHp < playerTank.maxHp) {
+                const regenAmount = playerTank.maxHp * playerTank.regenRate * (elapsed / 1000);
+                playerTank.currentHp = Math.min(playerTank.currentHp + regenAmount, playerTank.maxHp);
+            }
+            playerTank.lastRegenTime = now;
+        }
+
+        function applyUpgrade(statName) {
+            if (!playerTank || playerTank.isDead || !statName) return;
+            if (playerTank.upgradePoints > 0 && playerTank.upgrades[statName] < playerTank.maxStatLevel) {
+                playerTank.upgrades[statName]++;
+                playerTank.upgradePoints--;
+                applyStatEffects();
+                updateUI();
+                console.log(`Покращено ${statName}. Рівень: ${playerTank.upgrades[statName]}, Залишилось очок: ${playerTank.upgradePoints}`);
+            }
+        }
+
+        function selectClass(className) {
+             // Знаходимо українську назву класу за англійським ID (data-class)
+             const classConfig = Object.entries(CLASSES).find(([ukName, config]) => config.name === className);
+             if (!playerTank || !classConfig) return;
+
+             const ukrainianClassName = classConfig[0]; // Отримуємо українську назву
+
+             playerTank.class = ukrainianClassName; // Встановлюємо українську назву класу гравця
+             playerTank.selectedClass = className; // Зберігаємо англійську ID як вибраний клас
+             applyStatEffects(); // Recalculate stats with class bonuses
+             hideClassMenu();
+             updateUI(); // Update info panel with new class
+             console.log(`Клас вибрано: ${playerTank.class}`);
+        }
+
+
+        function showClassMenu() {
+            if (classMenuOverlay) {
+                isClassMenuOpen = true;
+                classMenuOverlay.classList.add('visible');
+            }
+        }
+        function hideClassMenu() {
+            if (classMenuOverlay) {
+                isClassMenuOpen = false;
+                classMenuOverlay.classList.remove('visible');
+            }
+        }
+
+        function showGameOverScreen() {
+            if (!gameOverScreen || !playerTank) return;
+            // Populate final stats
+            if (!finalLevelSpan) finalLevelSpan = document.getElementById('final-level');
+            if (!finalClassSpan) finalClassSpan = document.getElementById('final-class');
+            if (!finalExperienceSpan) finalExperienceSpan = document.getElementById('final-experience');
+            if (!finalScoreSpan) finalScoreSpan = document.getElementById('final-score');
+            if (!finalTanksKilledSpan) finalTanksKilledSpan = document.getElementById('final-tanks-killed');
+
+            if (finalLevelSpan) finalLevelSpan.innerText = playerTank.level;
+            if (finalClassSpan) finalClassSpan.innerText = playerTank.class; // Показуємо українську назву
+            if (finalExperienceSpan) finalExperienceSpan.innerText = Math.floor(playerTank.xp);
+            if (finalScoreSpan) finalScoreSpan.innerText = playerTank.score;
+            if (finalTanksKilledSpan) finalTanksKilledSpan.innerText = playerTank.tanksKilled;
+
+            gameOverScreen.classList.add('visible');
+        }
+        function hideGameOverScreen() {
+            if (gameOverScreen) gameOverScreen.classList.remove('visible');
+        }
+
+        function handlePlayerDeath() {
+            if (!playerTank || playerTank.isDead) return;
+            playerTank.isDead = true;
+            console.log("Гравець загинув!");
+            // FIX: Use 'R,G,B' format for color
+            createExplosion(playerTank.position.x, playerTank.position.y, playerTankSize * 2, '255,64,129', 800);
+            showGameOverScreen();
+            updateLeaderboard(); // Remove player from leaderboard
+        }
+
+        function restartGame() {
+            console.log("Перезапуск гри...");
+            // Deep copy initial state
+            playerTank = JSON.parse(JSON.stringify(initialPlayerState));
+            playerTank.position = { x: canvas.width / 2, y: canvas.height / 2 };
+            playerTank.lastRegenTime = Date.now();
+            playerTank.lastHitTime = 0;
+
+            // Clear game objects
+            playerBullets = [];
+            mobBullets = [];
+            shapes = [];
+            mobs = [];
+            explosions = [];
+
+            // Reset input state
+            Object.keys(keys).forEach(key => keys[key] = false);
+
+            // Hide overlays
+            hideClassMenu();
+            hideGameOverScreen();
+
+            // Setup UI and initial game state
+            setupInfoPanel(); // Recreate info panel structure
+            setupUpgradePanel(); // Recreate upgrade panel structure
+            applyStatEffects(); // Apply base stats
+            updateUI(); // Initial UI update
+
+            // Generate initial shapes and mobs
+            generateShapes(initialShapeCount);
+            for (let i = 0; i < Math.floor(MAX_MOBS / 2); i++) {
+                spawnMob(); // Spawn half the max mobs initially
+            }
+
+            playerTank.isDead = false;
+            console.log("Гру перезапущено.");
+        }
+
+        // --- Shape & Mob Generation ---
+        function createShape() {
+            const types = Object.keys(shapeTypes);
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            const properties = shapeTypes[randomType];
+            const sizeIndex = Math.floor(Math.random() * properties.sizes.length);
+            const size = properties.sizes[sizeIndex];
+            const exp = properties.exp * (properties.expMultipliers ? properties.expMultipliers[sizeIndex] : 1);
+            const health = properties.health * (properties.expMultipliers ? properties.expMultipliers[sizeIndex] : 1);
+            const bodyDamage = properties.bodyDamage || 0;
+
+            let x, y, attempts = 0;
+            const minDistanceToTank = 180;
+            const padding = size * 2;
+            do {
+                x = Math.random() * (canvas.width - padding * 2) + padding;
+                y = Math.random() * (canvas.height - padding * 2) + padding;
+                let tooClose = false;
+                // Check distance to player
+                if (playerTank && !playerTank.isDead && Math.hypot(x - playerTank.position.x, y - playerTank.position.y) < minDistanceToTank) {
+                    tooClose = true;
+                }
+                // Check distance to mobs
+                if (!tooClose) {
+                    for (const mob of mobs) {
+                        if (Math.hypot(x - mob.x, y - mob.y) < minDistanceToTank * 0.7) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                }
+                if (!tooClose) break;
+                attempts++;
+            } while (attempts < 50);
+
+            shapes.push({
+                type: randomType, x: x, y: y, drawX: x, drawY: y, size: size,
+                color: properties.color, outline: properties.outline, health: health, maxHealth: health,
+                exp: exp, bodyDamage: bodyDamage, hitFlashTimer: 0, vx: 0, vy: 0,
+                floatPhase: Math.random() * Math.PI * 2, floatSpeed: 0.4 + Math.random() * 0.6,
+                floatAmplitude: 0.4 + Math.random() * 1.2,
+                spawnTimer: 300,
+                rotation: Math.random() * Math.PI * 2,
+                currentHp: health
+            });
+        }
+
+        function generateShapes(count) {
+            shapes = []; // Clear existing shapes first
+            for (let i = 0; i < count; i++) createShape();
+        }
+
+        function spawnMob() {
+            if (mobs.length >= MAX_MOBS) return;
+
+            let x, y, attempts = 0;
+            const minDistance = 300;
+            const padding = mobSize * 2;
+
+            do {
+                x = Math.random() * (canvas.width - padding * 2) + padding;
+                y = Math.random() * (canvas.height - padding * 2) + padding;
+                let tooClose = false;
+                if (playerTank && !playerTank.isDead && Math.hypot(x - playerTank.position.x, y - playerTank.position.y) < minDistance) {
+                    tooClose = true;
+                }
+                if (!tooClose) {
+                    for (const otherMob of mobs) {
+                        if (Math.hypot(x - otherMob.x, y - otherMob.y) < minDistance * 0.6) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                }
+                if (!tooClose) break;
+                attempts++;
+            } while (attempts < 50);
+
+            const initialLevel = 1;
+            const initialXp = 0;
+            const initialHp = 70;
+            const initialBulletDamage = 7;
+            const initialMoveSpeedMax = (1.8 + Math.random() * 0.6) * SPEED_MULTIPLIER;
+
+            mobs.push({
+                id: Date.now() + Math.random(),
+                name: `Моб ${Math.random().toString(36).substring(2, 6)}`, // "Моб" замість "Mob"
+                x: x, y: y, vx: 0, vy: 0,
+                rotation: Math.random() * Math.PI * 2, turretAngle: 0,
+                maxHp: initialHp, currentHp: initialHp,
+                bodyDamage: 10, bulletDamage: initialBulletDamage,
+                bulletSpeed: 4 * SPEED_MULTIPLIER * 0.9,
+                bulletPenetration: 1.2,
+                shootCooldown: 550 + Math.random() * 200,
+                movementSpeed: { acc: 0.12 * SPEED_MULTIPLIER, max: initialMoveSpeedMax },
+                friction: 0.92,
+                lastShootTime: 0, baseXpValue: MOB_BASE_XP_VALUE, score: 0,
+                level: initialLevel, xp: initialXp, xpToNextLevel: calculateNextXP(initialLevel, true),
+                aiState: 'patrolling', target: null,
+                patrolTarget: { x: Math.random() * canvas.width, y: Math.random() * canvas.height },
+                lastAiUpdateTime: 0, detectionRadius: 450,
+                attackRange: 400,
+                hitFlashTimer: 0,
+            });
+            console.log(`Створено моба Р${initialLevel} в ${x.toFixed(0)}, ${y.toFixed(0)}. Всього мобів: ${mobs.length}`);
+            updateLeaderboard();
+        }
+
+        // --- AI & Physics Update Functions ---
+        function updateMobsAI(currentTime) {
+            const aiUpdateInterval = 200 + Math.random() * 100;
+
+            mobs.forEach(mob => {
+                if (currentTime - mob.lastAiUpdateTime < aiUpdateInterval) return;
+                mob.lastAiUpdateTime = currentTime;
+
+                let potentialTargets = [];
+                // 1. Player Target (Highest Priority)
+                if (playerTank && !playerTank.isDead) {
+                    const distToPlayer = Math.hypot(mob.x - playerTank.position.x, mob.y - playerTank.position.y);
+                    if (distToPlayer < mob.detectionRadius * 1.1) {
+                        potentialTargets.push({ type: 'player', id: null, distance: distToPlayer, x: playerTank.position.x, y: playerTank.position.y });
+                    }
+                }
+                // 2. Other Mob Target (Medium Priority)
+                 if (Math.random() < 0.35) {
+                     mobs.forEach(otherMob => {
+                         if (mob.id === otherMob.id) return;
+                         const distToMob = Math.hypot(mob.x - otherMob.x, mob.y - otherMob.y);
+                         if (distToMob < mob.detectionRadius) {
+                             potentialTargets.push({ type: 'mob', id: otherMob.id, distance: distToMob, x: otherMob.x, y: otherMob.y, level: otherMob.level });
+                         }
+                     });
+                 }
+                // 3. Shape Target (Lowest Priority unless low HP)
+                let closestShape = null;
+                let shapeSeekRadius = mob.detectionRadius * (mob.currentHp / mob.maxHp < 0.5 ? 1.3 : 0.7);
+                let minDistShape = shapeSeekRadius;
+
+                shapes.forEach(shape => {
+                    const distToShape = Math.hypot(mob.x - shape.drawX, mob.y - shape.drawY);
+                    if (distToShape < minDistShape) {
+                        minDistShape = distToShape;
+                        closestShape = shape;
+                    }
+                });
+                if (closestShape) {
+                    potentialTargets.push({ type: 'shape', id: null, distance: minDistShape, x: closestShape.drawX, y: closestShape.drawY });
+                }
+
+                // Prioritize targets: Player > Other Mobs (closer/higher level) > Low HP Shapes > Shapes
+                potentialTargets.sort((a, b) => {
+                    const getPriority = (target) => {
+                        if (target.type === 'player') return 0;
+                        if (target.type === 'mob') return 1;
+                        if (target.type === 'shape' && mob.currentHp / mob.maxHp < 0.5) return 2;
+                        if (target.type === 'shape') return 3;
+                        return 4;
+                    };
+                    const priorityA = getPriority(a);
+                    const priorityB = getPriority(b);
+
+                    if (priorityA !== priorityB) return priorityA - priorityB;
+
+                    // If same priority, refine:
+                    if (a.type === 'mob') {
+                        const levelDiff = (b.level || 0) - (a.level || 0);
+                        if (Math.abs(levelDiff) > 2) return levelDiff * 0.1;
+                        return a.distance - b.distance;
+                    }
+                    return a.distance - b.distance;
+                });
+
+                const chosenTarget = potentialTargets.length > 0 ? potentialTargets[0] : null;
+
+                if (chosenTarget) {
+                    mob.target = chosenTarget;
+                    mob.aiState = (chosenTarget.type === 'player' || chosenTarget.type === 'mob') ? 'attacking' : 'farming';
+                    const targetTurretAngle = Math.atan2(chosenTarget.y - mob.y, chosenTarget.x - mob.x);
+                    const angleDiff = targetTurretAngle - mob.turretAngle;
+                    mob.turretAngle = mob.turretAngle + Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff)) * 0.25;
+                } else {
+                    mob.aiState = 'patrolling';
+                    mob.target = null;
+                    if (Math.hypot(mob.x - mob.patrolTarget.x, mob.y - mob.patrolTarget.y) < 60 || Math.random() < 0.03) {
+                        mob.patrolTarget = { x: Math.random() * canvas.width, y: Math.random() * canvas.height };
+                    }
+                    const targetTurretAngle = Math.atan2(mob.patrolTarget.y - mob.y, mob.patrolTarget.x - mob.x);
+                    const angleDiff = targetTurretAngle - mob.turretAngle;
+                    mob.turretAngle = mob.turretAngle + Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff)) * 0.08;
+                }
+            });
+        }
+
+        function updateMobsPhysics(currentTime, timeStep) {
+            const avoidanceRadius = mobSize * 2.5;
+            const avoidanceStrength = 0.08;
+
+            mobs.forEach(mob => {
+                let targetMoveX = 0, targetMoveY = 0;
+                let avoidanceMoveX = 0, avoidanceMoveY = 0;
+                let targetAngle = mob.rotation;
+
+                // --- Calculate Target/Patrol Movement ---
+                if (mob.aiState !== 'patrolling' && mob.target) {
+                    targetAngle = Math.atan2(mob.target.y - mob.y, mob.target.x - mob.x);
+                    if (mob.target.type === 'player' || mob.target.type === 'mob') {
+                        const idealDist = mob.attackRange * 0.7;
+                        const distError = mob.target.distance - idealDist;
+                        if (Math.abs(distError) > 60 || mob.target.distance < idealDist * 0.8) {
+                            targetMoveX = Math.cos(targetAngle) * Math.sign(distError);
+                            targetMoveY = Math.sin(targetAngle) * Math.sign(distError);
+                        }
+                        if (Math.random() < 0.25) {
+                            const strafeAngle = targetAngle + (Math.random() < 0.5 ? -1 : 1) * Math.PI / 2;
+                            targetMoveX += Math.cos(strafeAngle) * 0.6;
+                            targetMoveY += Math.sin(strafeAngle) * 0.6;
+                        }
+                        if (mob.target.distance < mob.attackRange * 1.15) {
+                            mobShoot(mob, currentTime);
+                        }
+                    } else if (mob.target.type === 'shape') {
+                        targetMoveX = Math.cos(targetAngle);
+                        targetMoveY = Math.sin(targetAngle);
+                        if (mob.target.distance < mob.attackRange * 1.3) {
+                            mobShoot(mob, currentTime);
+                        }
+                    }
+                } else { // Patrolling
+                    targetAngle = Math.atan2(mob.patrolTarget.y - mob.y, mob.patrolTarget.x - mob.x);
+                    targetMoveX = Math.cos(targetAngle);
+                    targetMoveY = Math.sin(targetAngle);
+                    if (Math.random() < 0.1) {
+                        let closestShapePatrol = null;
+                        let minDistShapePatrol = 150;
+                        shapes.forEach(shape => {
+                             const distToShape = Math.hypot(mob.x - shape.drawX, mob.y - shape.drawY);
+                             if (distToShape < minDistShapePatrol) {
+                                 minDistShapePatrol = distToShape;
+                                 closestShapePatrol = shape;
+                             }
+                        });
+                        if (closestShapePatrol) {
+                            const shapeAngle = Math.atan2(closestShapePatrol.drawY - mob.y, closestShapePatrol.drawX - mob.x);
+                            const angleDiff = shapeAngle - mob.turretAngle;
+                            mob.turretAngle += Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff)) * 0.15;
+                            mobShoot(mob, currentTime);
+                        }
+                    }
+                }
+
+                // --- Calculate Shape Avoidance ---
+                shapes.forEach(shape => {
+                    const dist = Math.hypot(mob.x - shape.drawX, mob.y - shape.drawY);
+                    const combinedSize = (mobSize + mob.level * 0.5) / 2 + shape.size / 2;
+                    const effectiveAvoidanceRadius = combinedSize + 30;
+
+                    if (dist < effectiveAvoidanceRadius) {
+                        const angleAway = Math.atan2(mob.y - shape.drawY, mob.x - shape.drawX);
+                        const strength = (1 - dist / effectiveAvoidanceRadius) * avoidanceStrength;
+                        avoidanceMoveX += Math.cos(angleAway) * strength;
+                        avoidanceMoveY += Math.sin(angleAway) * strength;
+                    }
+                });
+
+                // --- Combine Movement Vectors ---
+                let finalMoveX = targetMoveX + avoidanceMoveX;
+                let finalMoveY = targetMoveY + avoidanceMoveY;
+
+                // Normalize combined move vector
+                const finalMoveLen = Math.hypot(finalMoveX, finalMoveY);
+                if (finalMoveLen > 1) {
+                    finalMoveX /= finalMoveLen;
+                    finalMoveY /= finalMoveLen;
+                }
+
+                // Smooth body rotation
+                const bodyAngleDiff = targetAngle - mob.rotation;
+                mob.rotation += Math.atan2(Math.sin(bodyAngleDiff), Math.cos(bodyAngleDiff)) * 0.12 * (timeStep / 16.67);
+
+                // Apply acceleration
+                mob.vx += finalMoveX * mob.movementSpeed.acc * (timeStep / 16.67);
+                mob.vy += finalMoveY * mob.movementSpeed.acc * (timeStep / 16.67);
+
+                // Apply friction
+                mob.vx *= Math.pow(mob.friction, timeStep / 16.67);
+                mob.vy *= Math.pow(mob.friction, timeStep / 16.67);
+
+                // Clamp speed
+                let speed = Math.hypot(mob.vx, mob.vy);
+                if (speed > mob.movementSpeed.max) {
+                    const factor = mob.movementSpeed.max / speed;
+                    mob.vx *= factor;
+                    mob.vy *= factor;
+                }
+
+                // Update position
+                mob.x += mob.vx * (timeStep / 16.67);
+                mob.y += mob.vy * (timeStep / 16.67);
+
+                // Clamp position
+                const halfSize = (mobSize + mob.level * 0.5) / 2;
+                mob.x = clamp(mob.x, halfSize, canvas.width - halfSize);
+                mob.y = clamp(mob.y, halfSize, canvas.height - halfSize);
+
+                // Update hit flash timer
+                if (mob.hitFlashTimer > 0) {
+                    mob.hitFlashTimer = Math.max(0, mob.hitFlashTimer - timeStep);
+                }
+            });
+        }
+
+        function mobShoot(mob, currentTime) {
+            if (currentTime - mob.lastShootTime > mob.shootCooldown * 0.95) {
+                const mobBarrelLength = 20 + mob.level * 0.2;
+                const startX = mob.x + Math.cos(mob.turretAngle) * mobBarrelLength;
+                const startY = mob.y + Math.sin(mob.turretAngle) * mobBarrelLength;
+                const vx = Math.cos(mob.turretAngle) * mob.bulletSpeed;
+                const vy = Math.sin(mob.turretAngle) * mob.bulletSpeed;
+
+                mobBullets.push({
+                    x: startX, y: startY, vx: vx, vy: vy,
+                    penetration: mob.bulletPenetration + Math.random() * 0.2,
+                    damage: mob.bulletDamage * (0.9 + Math.random() * 0.2),
+                    ownerId: mob.id,
+                    radius: 4 + mob.level * 0.05,
+                    color: '#FF6347',
+                    outline: '#FFDAB9'
+                });
+                mob.lastShootTime = currentTime;
+                gainMobExperience(mob, MOB_SHOT_XP_GAIN);
+            }
+        }
+
+        function updateMobBullets(timeStep) {
+            for (let i = mobBullets.length - 1; i >= 0; i--) {
+                const bullet = mobBullets[i];
+                bullet.x += bullet.vx * (timeStep / 16.67);
+                bullet.y += bullet.vy * (timeStep / 16.67);
+                if (bullet.x < -100 || bullet.x > canvas.width + 100 || bullet.y < -100 || bullet.y > canvas.height + 100) {
+                    mobBullets.splice(i, 1);
+                }
+            }
+        }
+
+        function updateShapePhysics(currentTime, timeStep) {
+            shapes.forEach(shape => {
+                // Apply friction
+                shape.vx *= Math.pow(0.92, timeStep / 16.67);
+                shape.vy *= Math.pow(0.92, timeStep / 16.67);
+                // Update position
+                shape.x += shape.vx * (timeStep / 16.67);
+                shape.y += shape.vy * (timeStep / 16.67);
+                // Clamp to bounds
+                const halfSize = shape.size / 2;
+                shape.x = clamp(shape.x, halfSize, canvas.width - halfSize);
+                shape.y = clamp(shape.y, halfSize, canvas.height - halfSize);
+                // Smooth floating effect
+                const floatX = Math.sin(currentTime * 0.0004 * shape.floatSpeed + shape.floatPhase) * shape.floatAmplitude;
+                const floatY = Math.cos(currentTime * 0.0004 * shape.floatSpeed + shape.floatPhase) * shape.floatAmplitude;
+                // Lerp draw position
+                shape.drawX = lerp(shape.drawX, shape.x + floatX, 0.15);
+                shape.drawY = lerp(shape.drawY, shape.y + floatY, 0.15);
+                // Update rotation
+                shape.rotation += shape.vx * 0.001 * (timeStep / 16.67);
+                 // Update spawn timer
+                 if (shape.spawnTimer > 0) {
+                     shape.spawnTimer = Math.max(0, shape.spawnTimer - timeStep);
+                 }
+                 // Update hit flash
+                 if (shape.hitFlashTimer > 0) {
+                     shape.hitFlashTimer = Math.max(0, shape.hitFlashTimer - timeStep);
+                 }
+            });
+        }
+
+        function updatePlayerTankPosition(timeStep) {
+            if (!playerTank || playerTank.isDead) return;
+            let moveX = 0, moveY = 0;
+            if (keys.w || keys.arrowUp) moveY -= 1;
+            if (keys.s || keys.arrowDown) moveY += 1;
+            if (keys.a || keys.arrowLeft) moveX -= 1;
+            if (keys.d || keys.arrowRight) moveX += 1;
+
+            // Normalize diagonal movement
+            const moveLen = Math.hypot(moveX, moveY);
+            if (moveLen > 0) {
+                moveX /= moveLen;
+                moveY /= moveLen;
+                // Apply acceleration
+                playerTank.velocity.x += moveX * playerTank.movementSpeed.acc * (timeStep / 16.67);
+                playerTank.velocity.y += moveY * playerTank.movementSpeed.acc * (timeStep / 16.67);
+            }
+
+            // Apply friction
+            playerTank.velocity.x *= Math.pow(playerTank.friction, timeStep / 16.67);
+            playerTank.velocity.y *= Math.pow(playerTank.friction, timeStep / 16.67);
+
+            // Clamp speed
+            let speed = Math.hypot(playerTank.velocity.x, playerTank.velocity.y);
+            if (speed > playerTank.movementSpeed.max) {
+                const factor = playerTank.movementSpeed.max / speed;
+                playerTank.velocity.x *= factor;
+                playerTank.velocity.y *= factor;
+            }
+
+            // Update position
+            playerTank.position.x += playerTank.velocity.x * (timeStep / 16.67);
+            playerTank.position.y += playerTank.velocity.y * (timeStep / 16.67);
+
+            // Clamp to bounds
+            const halfSize = playerTankSize / 2;
+            playerTank.position.x = clamp(playerTank.position.x, halfSize, canvas.width - halfSize);
+            playerTank.position.y = clamp(playerTank.position.y, halfSize, canvas.height - halfSize);
+        }
+
+        function updatePlayerTankRotation(timeStep) {
+            if (!playerTank || playerTank.isDead) return;
+            // Smooth turret aim
+            const targetAngle = Math.atan2(mouseY - playerTank.position.y, mouseX - playerTank.position.x);
+            const angleDiff = targetAngle - playerTank.turretAngle;
+            playerTank.turretAngle += Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff)) * 0.3 * (timeStep / 16.67);
+
+            // Smooth body rotation
+            const speed = Math.hypot(playerTank.velocity.x, playerTank.velocity.y);
+            let bodyTargetAngle;
+            let turnSpeedFactor;
+
+            if (speed > 0.2 * SPEED_MULTIPLIER) {
+                bodyTargetAngle = Math.atan2(playerTank.velocity.y, playerTank.velocity.x);
+                turnSpeedFactor = 0.15;
+            } else {
+                bodyTargetAngle = playerTank.turretAngle;
+                turnSpeedFactor = 0.08;
+            }
+
+            const bodyAngleDiff = bodyTargetAngle - playerTank.rotation;
+            playerTank.rotation += Math.atan2(Math.sin(bodyAngleDiff), Math.cos(bodyAngleDiff)) * turnSpeedFactor * (timeStep / 16.67);
+        }
+
+        function updatePlayerBullets(timeStep) {
+            for (let i = playerBullets.length - 1; i >= 0; i--) {
+                const bullet = playerBullets[i];
+                bullet.x += bullet.vx * (timeStep / 16.67);
+                bullet.y += bullet.vy * (timeStep / 16.67);
+                if (bullet.x < -100 || bullet.x > canvas.width + 100 || bullet.y < -100 || bullet.y > canvas.height + 100) {
+                    playerBullets.splice(i, 1);
+                }
+            }
+        }
+
+        function updateEffects(timeStep) {
+            if (!playerTank) return;
+            // Player effects
+            if (playerTank.upgradePulseTimer > 0) playerTank.upgradePulseTimer = Math.max(0, playerTank.upgradePulseTimer - timeStep);
+            if (playerTank.recoil > 0) playerTank.recoil = Math.max(0, playerTank.recoil - playerTank.recoilSpeed * timeStep * 6);
+            if (playerTank.levelUpFlashTimer > 0) playerTank.levelUpFlashTimer = Math.max(0, playerTank.levelUpFlashTimer - timeStep);
+            // Smooth XP bar update
+            playerTank.currentVisibleXP = lerp(playerTank.currentVisibleXP, playerTank.xp, 0.08 * (timeStep / 16.67));
+        }
+
+        // --- Collision Detection ---
+        function checkCollisions() {
+            if (!playerTank || (playerTank.isDead && mobs.length === 0)) return;
+
+            // --- Bullet Collisions ---
+            checkBulletCollisions(playerBullets, shapes, 'player', 'shape');
+            checkBulletCollisions(playerBullets, mobs, 'player', 'mob');
+            if (!playerTank.isDead) {
+                 checkBulletCollisions(mobBullets, [playerTank], 'mob', 'player');
+            }
+            checkBulletCollisions(mobBullets, shapes, 'mob', 'shape');
+            checkBulletCollisions(mobBullets, mobs, 'mob', 'mob');
+            checkBulletVsBulletCollisions();
+
+            // --- Body Collisions ---
+             if (!playerTank.isDead) {
+                 checkBodyCollisions(playerTank, shapes, 'player', 'shape');
+                 checkBodyCollisions(playerTank, mobs, 'player', 'mob');
+             }
+             checkMobVsMobBodyCollisions();
+             checkMobVsShapeBodyCollisions();
+        }
+
+        // Generic function for bullet vs target group collisions
+        function checkBulletCollisions(bullets, targets, bulletOwnerType, targetType) {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                if (!bullet) continue;
+
+                for (let j = targets.length - 1; j >= 0; j--) {
+                    const target = targets[j];
+                    if (!target || (targetType === 'mob' && bullet.ownerId === target.id)) continue;
+
+                     const targetPos = targetType === 'player' ? { x: target.position.x, y: target.position.y } :
+                                       (targetType === 'shape' ? { x: target.drawX, y: target.drawY } :
+                                       { x: target.x, y: target.y });
+
+                     const targetSize = targetType === 'player' ? playerTankSize : (targetType === 'mob' ? (mobSize + target.level * 0.5) : target.size);
+
+                     if (targetPos.x === undefined || targetPos.y === undefined || targetSize === undefined) {
+                         console.warn("Пропуск перевірки зіткнення через недійсні дані цілі:", {targetType, target, targetPos, targetSize});
+                         continue;
+                     }
+
+                    const dist = Math.hypot(bullet.x - targetPos.x, bullet.y - targetPos.y);
+                    const combinedRadius = (bullet.radius || 5) + targetSize / 2;
+
+                    if (dist < combinedRadius) {
+                        handleBulletHit(bullet, target, bulletOwnerType, targetType);
+
+                        if (bullet.penetration <= 0) {
+                            const explosionColor = hexToRgb(bullet.outline || '#FFFFFF');
+                            createExplosion(bullet.x, bullet.y, bullet.radius * 1.5, explosionColor, 80);
+                            bullets.splice(i, 1);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Handle the effects of a bullet hitting a target
+        function handleBulletHit(bullet, target, bulletOwnerType, targetType) {
+            const damageDealt = bullet.damage;
+
+            let targetHpProp = targetType === 'shape' ? 'health' : 'currentHp';
+            if (target[targetHpProp] === undefined) return;
+
+            target[targetHpProp] -= damageDealt;
+
+            if (targetType !== 'player') target.hitFlashTimer = 150;
+            else target.lastHitTime = Date.now();
+
+            // Apply knockback
+            const impulse = damageDealt * 0.08;
+            const targetPos = targetType === 'player' ? target.position : (targetType === 'shape' ? { x: target.drawX, y: target.drawY } : target);
+            const angle = Math.atan2(targetPos.y - bullet.y, targetPos.x - bullet.x);
+
+            if (target.velocity !== undefined) { // Player
+                 target.velocity.x += Math.cos(angle) * impulse;
+                 target.velocity.y += Math.sin(angle) * impulse;
+            } else if (target.vx !== undefined && target.vy !== undefined) { // Mobs/Shapes
+                 target.vx += Math.cos(angle) * impulse;
+                 target.vy += Math.sin(angle) * impulse;
+            }
+
+            bullet.penetration--;
+
+            // Check target death
+            if (target[targetHpProp] <= 0) {
+                handleTargetDeath(target, bulletOwnerType, targetType, bullet.ownerId);
+            }
+        }
+
+        // Handle target death logic
+        function handleTargetDeath(target, killerType, targetType, killerId = null) {
+            let explosionColorRgb = '255,255,255';
+            let explosionSize = 10;
+            let xpGained = 0;
+            let killer = null;
+            let targetPos = { x: target.x, y: target.y };
+
+            // Find the killer entity
+            if (killerType === 'player') killer = playerTank;
+            else if (killerType === 'mob') killer = mobs.find(m => m.id === killerId);
+
+            if (targetType === 'player') {
+                handlePlayerDeath();
+                return;
+            } else if (targetType === 'shape') {
+                explosionColorRgb = hexToRgb(target.outline || '#FFFF00');
+                explosionSize = target.size * 1.2;
+                xpGained = target.exp;
+                targetPos = { x: target.drawX, y: target.drawY };
+                const index = shapes.findIndex(s => s === target);
+                if (index > -1) shapes.splice(index, 1);
+                if (Math.random() < 0.8) createShape();
+                if (Math.random() < 0.3) createShape();
+            } else if (targetType === 'mob') {
+                explosionColorRgb = '255,99,71';
+                explosionSize = (mobSize + target.level * 0.5) * 1.5;
+                xpGained = target.baseXpValue * (killerType === 'player' ? MOB_XP_MULTIPLIER : 1);
+                targetPos = { x: target.x, y: target.y };
+                 const index = mobs.findIndex(m => m.id === target.id);
+                 if (index > -1) mobs.splice(index, 1);
+                setTimeout(spawnMob, MOB_RESPAWN_DELAY * (1 + Math.random()));
+                updateLeaderboard();
+            }
+
+            createExplosion(targetPos.x, targetPos.y, explosionSize, explosionColorRgb, 300 + explosionSize * 5);
+
+            // Grant XP
+            if (killer && xpGained > 0) {
+                if (killerType === 'player') {
+                    gainExperience(xpGained);
+                    if (targetType === 'mob' && playerTank) playerTank.tanksKilled++;
+                } else if (killerType === 'mob') {
+                    gainMobExperience(killer, xpGained);
+                }
+            }
+             updateUI();
+        }
+
+        // Check bullet vs bullet collisions
+        function checkBulletVsBulletCollisions() {
+            for (let i = playerBullets.length - 1; i >= 0; i--) {
+                const pBullet = playerBullets[i];
+                if (!pBullet) continue;
+                for (let j = mobBullets.length - 1; j >= 0; j--) {
+                    const mBullet = mobBullets[j];
+                    if (!mBullet) continue;
+
+                    const dist = Math.hypot(pBullet.x - mBullet.x, pBullet.y - mBullet.y);
+                    const combinedRadius = (pBullet.radius || 5) + (mBullet.radius || 4);
+
+                    if (dist < combinedRadius) {
+                        createExplosion((pBullet.x + mBullet.x) / 2, (pBullet.y + mBullet.y) / 2, combinedRadius * 0.8, '170,170,170', 60);
+                        playerBullets.splice(i, 1);
+                        mobBullets.splice(j, 1);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Generic function for body collisions
+        function checkBodyCollisions(entity, targets, entityType, targetType) {
+             if (!entity || (entityType === 'player' && entity.isDead)) return;
+
+             const entityPos = entityType === 'player' ? entity.position : { x: entity.x, y: entity.y };
+             const entitySize = entityType === 'player' ? playerTankSize : (entityType === 'mob' ? (mobSize + entity.level * 0.5) : entity.size);
+             if (entityPos.x === undefined || entityPos.y === undefined || entitySize === undefined) return;
+
+
+             for (let i = targets.length - 1; i >= 0; i--) {
+                 const target = targets[i];
+                 if (!target || target === entity) continue;
+
+                 const targetPos = targetType === 'player' ? target.position : (targetType === 'shape' ? { x: target.drawX, y: target.drawY } : { x: target.x, y: target.y });
+                 const targetSize = targetType === 'player' ? playerTankSize : (targetType === 'mob' ? (mobSize + target.level * 0.5) : target.size);
+                 if (targetPos.x === undefined || targetPos.y === undefined || targetSize === undefined) continue;
+
+                 const dist = Math.hypot(entityPos.x - targetPos.x, entityPos.y - targetPos.y);
+                 const combinedRadius = entitySize / 2 + targetSize / 2;
+
+                 if (dist < combinedRadius * 0.95) {
+                     handleBodyCollision(entity, target, entityType, targetType);
+                     if (entityType === 'player' && entity.isDead) {
+                         return;
+                     }
+                 }
+             }
+        }
+
+        // Handle the effects of two bodies colliding
+        function handleBodyCollision(entity, target, entityType, targetType) {
+             const entityHpProp = entityType === 'shape' ? 'health' : 'currentHp';
+             const targetHpProp = targetType === 'shape' ? 'health' : 'currentHp';
+             const entityBodyDamage = entity.bodyDamage || 0;
+             const targetBodyDamage = target.bodyDamage || 0;
+
+             if (entity[entityHpProp] === undefined || target[targetHpProp] === undefined) return;
+
+            // Calculate damage
+            const damageToEntity = targetBodyDamage * 0.7;
+            const damageToTarget = entityBodyDamage * 0.7;
+
+            // Apply damage
+            entity[entityHpProp] -= damageToEntity;
+            if (entityType === 'player') entity.lastHitTime = Date.now();
+            else if (entity.hitFlashTimer !== undefined) entity.hitFlashTimer = 100;
+
+            target[targetHpProp] -= damageToTarget;
+            if (targetType === 'player') target.lastHitTime = Date.now();
+            else if (target.hitFlashTimer !== undefined) target.hitFlashTimer = 100;
+
+
+            // Apply knockback
+            const entityPos = entityType === 'player' ? entity.position : { x: entity.x, y: entity.y };
+            const targetPos = targetType === 'player' ? target.position : (targetType === 'shape' ? { x: target.drawX, y: target.drawY } : { x: target.x, y: target.y });
+             if (entityPos.x === undefined || targetPos.x === undefined) return;
+
+            const angle = Math.atan2(targetPos.y - entityPos.y, targetPos.x - entityPos.x);
+            const impulse = 6;
+            const massFactorEntity = targetType === 'shape' ? 0.3 : 0.5;
+            const massFactorTarget = entityType === 'shape' ? 0.3 : 0.5;
+
+            // Apply knockback
+            if (entity.velocity !== undefined) { // Player
+                 entity.velocity.x -= Math.cos(angle) * impulse * massFactorEntity;
+                 entity.velocity.y -= Math.sin(angle) * impulse * massFactorEntity;
+            } else if (entity.vx !== undefined && entity.vy !== undefined) { // Mobs/Shapes
+                 entity.vx -= Math.cos(angle) * impulse * massFactorEntity;
+                 entity.vy -= Math.sin(angle) * impulse * massFactorEntity;
+            }
+
+            if (target.velocity !== undefined) { // Player
+                 target.velocity.x += Math.cos(angle) * impulse * massFactorTarget;
+                 target.velocity.y += Math.sin(angle) * impulse * massFactorTarget;
+            } else if (target.vx !== undefined && target.vy !== undefined) { // Mobs/Shapes
+                 target.vx += Math.cos(angle) * impulse * massFactorTarget;
+                 target.vy += Math.sin(angle) * impulse * massFactorTarget;
+            }
+
+            // Check for death
+            if (entity[entityHpProp] <= 0) {
+                 handleTargetDeath(entity, targetType, entityType, target.id);
+            }
+             const targetStillExists = (targetType === 'mob' && mobs.some(m => m.id === target.id)) ||
+                                      (targetType === 'shape' && shapes.some(s => s === target)) ||
+                                      (targetType === 'player' && !target.isDead);
+
+             if (entity[entityHpProp] > 0 && targetStillExists && target[targetHpProp] <= 0) {
+                 handleTargetDeath(target, entityType, targetType, entity.id);
+             }
+        }
+
+        // Specific check for Mob vs Mob body collisions
+        function checkMobVsMobBodyCollisions() {
+            for (let i = 0; i < mobs.length; i++) {
+                for (let j = i + 1; j < mobs.length; j++) {
+                    const mob1 = mobs[i];
+                    const mob2 = mobs[j];
+                    if (!mob1 || !mob2) continue;
+
+                    const mob1Size = mobSize + mob1.level * 0.5;
+                    const mob2Size = mobSize + mob2.level * 0.5;
+                    const dist = Math.hypot(mob1.x - mob2.x, mob1.y - mob2.y);
+                    const combinedRadius = mob1Size / 2 + mob2Size / 2;
+
+                    if (dist < combinedRadius * 0.95) {
+                        handleBodyCollision(mob1, mob2, 'mob', 'mob');
+                    }
+                }
+            }
+        }
+        // Check Mob vs Shape body collisions
+        function checkMobVsShapeBodyCollisions() {
+             for (let i = mobs.length - 1; i >= 0; i--) {
+                 const mob = mobs[i];
+                 if (!mob) continue;
+                 checkBodyCollisions(mob, shapes, 'mob', 'shape');
+             }
+        }
+
+
+        // --- Player Actions ---
+        function playerShoot() {
+            if (!playerTank || isClassMenuOpen || playerTank.isDead) return;
+            const now = Date.now();
+            if (now - playerTank.lastShootTime > playerTank.shootCooldown) {
+                const currentClassConfig = CLASSES[playerTank.class]; // Використовуємо українську назву
+                if (!currentClassConfig) return;
+
+                const shootBulletFromBarrel = (barrel) => {
+                    const baseAngle = playerTank.turretAngle;
+                    const barrelAngle = baseAngle + barrel.angle;
+
+                    const barrelTipX = Math.cos(baseAngle) * barrel.length;
+                    const barrelTipY = Math.sin(baseAngle) * barrel.length;
+
+                    const offsetAngle = baseAngle + Math.PI / 2;
+                    const offsetX = Math.cos(offsetAngle) * barrel.offset;
+                    const offsetY = Math.sin(offsetAngle) * barrel.offset;
+
+                    const startX = playerTank.position.x + barrelTipX + offsetX;
+                    const startY = playerTank.position.y + barrelTipY + offsetY;
+
+                    const vx = Math.cos(barrelAngle) * playerTank.bulletSpeed;
+                    const vy = Math.sin(barrelAngle) * playerTank.bulletSpeed;
+                    playerBullets.push({
+                        x: startX, y: startY, vx: vx, vy: vy,
+                        penetration: playerTank.bulletPenetration,
+                        damage: playerTank.bulletDamage,
+                        radius: 5.5,
+                        color: '#00e0ff',
+                        outline: '#FFFFFF'
+                    });
+                };
+
+                currentClassConfig.barrels.forEach(shootBulletFromBarrel);
+
+                playerTank.recoil = playerTank.recoilAmount;
+                playerTank.lastShootTime = now;
+            }
+        }
+
+        // --- Drawing Functions ---
+        function drawGrid() {
+            const gridSize = 60;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += gridSize) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
+            for (let y = 0; y < canvas.height; y += gridSize) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
+        }
+
+        // Shape Drawing Functions
+        function drawSquare(shape, currentTime, timeStep) {
+            ctx.fillRect(-shape.currentSize / 2, -shape.currentSize / 2, shape.currentSize, shape.currentSize);
+            ctx.strokeRect(-shape.currentSize / 2, -shape.currentSize / 2, shape.currentSize, shape.currentSize);
+        }
+        function drawTriangle(shape, currentTime, timeStep) {
+             const h = shape.currentSize * (Math.sqrt(3)/2);
+             ctx.beginPath();
+             ctx.moveTo(0, -h / 1.5);
+             ctx.lineTo(-shape.currentSize / 2, h / 2.5);
+             ctx.lineTo(shape.currentSize / 2, h / 2.5);
+             ctx.closePath();
+             ctx.fill();
+             ctx.stroke();
+        }
+        function drawPentagon(shape, currentTime, timeStep) {
+            const numSides = 5, angleIncrement = (Math.PI * 2) / numSides, radius = shape.currentSize / 2;
+            ctx.beginPath();
+            ctx.moveTo(radius * Math.cos(-Math.PI / 2), radius * Math.sin(-Math.PI / 2));
+            for (let i = 1; i <= numSides; i++) {
+                ctx.lineTo(radius * Math.cos(-Math.PI / 2 + angleIncrement * i), radius * Math.sin(-Math.PI / 2 + angleIncrement * i));
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function drawShapes(currentTime, timeStep) {
+            shapes.forEach(shape => {
+                const currentHp = shape.health;
+                const maxHp = shape.maxHealth;
+
+                shape.currentSize = shape.size;
+                let currentOpacity = 1;
+                if (shape.spawnTimer > 0) {
+                    const progress = 1 - (shape.spawnTimer / 300);
+                    shape.currentSize = lerp(0, shape.size, progress * progress);
+                    currentOpacity = progress;
+                }
+
+                ctx.save();
+                ctx.translate(shape.drawX, shape.drawY);
+                ctx.rotate(shape.rotation);
+                ctx.globalAlpha = currentOpacity;
+                ctx.fillStyle = shape.color;
+                ctx.strokeStyle = shape.outline;
+                ctx.lineWidth = 2;
+
+                const drawFunc = shapeTypes[shape.type]?.drawFunc;
+                if (drawFunc) {
+                    drawFunc(shape, currentTime, timeStep);
+                } else {
+                    ctx.beginPath(); ctx.arc(0, 0, shape.currentSize / 2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                }
+
+                ctx.restore();
+
+                 if (currentHp < maxHp && currentHp > 0) {
+                     drawHealthBar(shape.drawX, shape.drawY, shape.size, currentHp, maxHp, '#ffeb3b', '#c0b02a');
+                 }
+
+                 if (shape.hitFlashTimer > 0) {
+                     const flashProgress = shape.hitFlashTimer / 150;
+                     const flashRadius = shape.size * 0.7 * (1 - flashProgress);
+                     ctx.fillStyle = `rgba(255, 255, 255, ${flashProgress * 0.8})`;
+                     ctx.beginPath(); ctx.arc(shape.drawX, shape.drawY, flashRadius, 0, Math.PI * 2); ctx.fill();
+                 }
+            });
+             ctx.globalAlpha = 1;
+        }
+
+        // Generic Health Bar Drawing Function
+        function drawHealthBar(x, y, ownerSize, currentHp, maxHp, fillColor, outlineColor = '#333') {
+             if (currentHp === undefined || maxHp === undefined || currentHp >= maxHp || currentHp <= 0 || maxHp <= 0) return;
+
+             const barWidth = ownerSize * 1.3;
+             const barHeight = 5;
+             const yOffset = ownerSize * 0.7 + 8;
+             const currentWidth = Math.max(0, (currentHp / maxHp) * barWidth);
+
+             // Background
+             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+             ctx.fillRect(x - barWidth / 2, y - yOffset - barHeight, barWidth, barHeight);
+
+             // Fill
+             ctx.fillStyle = fillColor;
+             ctx.fillRect(x - barWidth / 2, y - yOffset - barHeight, currentWidth, barHeight);
+
+             // Outline
+             ctx.strokeStyle = outlineColor;
+             ctx.lineWidth = 1;
+             ctx.strokeRect(x - barWidth / 2, y - yOffset - barHeight, barWidth, barHeight);
+        }
+        // Generic XP Bar Drawing Function
+        function drawXPBar(x, y, ownerSize, currentXp, xpToNext, fillColor, outlineColor = '#333') {
+             if (currentXp === undefined || xpToNext === undefined || xpToNext === Infinity || xpToNext <= 0) return;
+
+             const barWidth = ownerSize * 1.6;
+             const barHeight = 5;
+             const yOffset = ownerSize * 0.7 + 5;
+             const currentWidth = Math.max(0, (currentXp / xpToNext) * barWidth);
+
+             // Background
+             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+             ctx.fillRect(x - barWidth / 2, y + yOffset, barWidth, barHeight);
+
+             // Fill
+             ctx.fillStyle = fillColor;
+             ctx.fillRect(x - barWidth / 2, y + yOffset, currentWidth, barHeight);
+
+             // Outline
+             ctx.strokeStyle = outlineColor;
+             ctx.lineWidth = 1;
+             ctx.strokeRect(x - barWidth / 2, y + yOffset, barWidth, barHeight);
+        }
+
+
+        function drawPlayerTank() {
+            if (!playerTank || playerTank.isDead) return;
+            const { x, y } = playerTank.position;
+            const size = playerTankSize;
+
+            ctx.save();
+            ctx.translate(x, y);
+
+            // --- Draw Shadow ---
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(0, size * 0.1, size * 0.6, size * 0.3, playerTank.rotation, 0, Math.PI * 2);
+            ctx.filter = 'blur(6px)';
+            ctx.fill();
+            ctx.filter = 'none';
+
+            // --- Draw Body ---
+            ctx.rotate(playerTank.rotation);
+            ctx.fillStyle = '#00BFFF';
+            ctx.strokeStyle = '#005f7f';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowColor = 'rgba(0, 224, 255, 0.5)';
+            ctx.shadowBlur = 10;
+            ctx.stroke();
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+
+            // --- Draw Turret / Barrels ---
+            ctx.save();
+            ctx.rotate(playerTank.turretAngle - playerTank.rotation);
+
+            const barrelRecoilOffset = -playerTank.recoil;
+            ctx.fillStyle = '#AEAEAE';
+            ctx.strokeStyle = '#606060';
+            ctx.lineWidth = 2;
+
+            const drawRoundedRect = (x, y, width, height, radius) => {
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + width - radius, y);
+                ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+                ctx.lineTo(x + width, y + height - radius);
+                ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+                ctx.lineTo(x + radius, y + height);
+                ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            };
+
+            const currentClassConfig = CLASSES[playerTank.class]; // Використовуємо українську назву
+            if (currentClassConfig?.barrels) {
+                currentClassConfig.barrels.forEach(barrel => {
+                    ctx.save();
+                    ctx.rotate(barrel.angle);
+                    const offX = 0;
+                    const offY = barrel.offset;
+                    drawRoundedRect(barrelRecoilOffset + offX, -barrel.width / 2 + offY, barrel.length, barrel.width, barrel.width * 0.3);
+                    ctx.restore();
+                });
+            } else {
+                drawRoundedRect(barrelRecoilOffset, -baseBarrelWidth / 2, baseBarrelLength, baseBarrelWidth, baseBarrelWidth * 0.3);
+            }
+
+            ctx.restore();
+            ctx.restore();
+
+            // --- Draw UI Elements (HP, XP, Name) ---
+             drawHealthBar(x, y, size, playerTank.currentHp, playerTank.maxHp, '#4caf50', '#2e7d32');
+             drawXPBar(x, y, size, playerTank.currentVisibleXP, playerTank.xpToNextLevel, '#ffc107', '#ffa000');
+
+             // Draw Name & Level Label
+             ctx.fillStyle = '#FFFFFF';
+             ctx.font = 'bold 13px Inter, sans-serif';
+             ctx.textAlign = 'center';
+             ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+             ctx.shadowBlur = 3;
+             ctx.shadowOffsetX = 1;
+             ctx.shadowOffsetY = 1;
+             ctx.fillText(`${playerTank.name} - Рів ${playerTank.level}`, x, y + size * 0.7 + 22);
+             ctx.shadowColor = 'transparent';
+             ctx.shadowBlur = 0;
+             ctx.shadowOffsetX = 0;
+             ctx.shadowOffsetY = 0;
+
+            // --- Draw Effects (Pulse, Flash) ---
+            if (playerTank.upgradePulseTimer > 0) {
+                const alpha = (playerTank.upgradePulseTimer / playerTank.upgradePulseDuration) * 0.8;
+                const radius = size * 0.8 + size * 0.7 * (1 - alpha);
+                ctx.strokeStyle = `rgba(255, 152, 0, ${alpha})`;
+                ctx.lineWidth = 3 + 3 * (1 - alpha);
+                ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.stroke();
+            }
+            if (playerTank.levelUpFlashTimer > 0) {
+                const alpha = (playerTank.levelUpFlashTimer / playerTank.levelUpFlashDuration);
+                const radius = size * 0.5 + size * 2.0 * (1 - alpha * 0.8);
+                ctx.fillStyle = `rgba(255, 193, 7, ${alpha * 0.5})`;
+                ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+
+        function drawMobs() {
+            mobs.forEach(mob => {
+                const { x, y, level } = mob;
+                const size = mobSize + level * 0.5;
+
+                ctx.save();
+                ctx.translate(x, y);
+
+                // Shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                ctx.beginPath(); ctx.ellipse(0, size * 0.1, size * 0.5, size * 0.25, mob.rotation, 0, Math.PI * 2);
+                ctx.filter = 'blur(5px)'; ctx.fill(); ctx.filter = 'none';
+
+                // Body
+                ctx.rotate(mob.rotation);
+                ctx.fillStyle = '#9E9E9E';
+                ctx.strokeStyle = '#616161';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath(); ctx.arc(0, 0, size / 2, 0, Math.PI * 2); ctx.fill();
+                ctx.shadowColor = 'rgba(255, 99, 71, 0.4)';
+                ctx.shadowBlur = 8;
+                ctx.stroke();
+                ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+
+                // Turret
+                ctx.save();
+                ctx.rotate(mob.turretAngle - mob.rotation);
+                ctx.fillStyle = '#757575';
+                ctx.strokeStyle = '#424242';
+                ctx.lineWidth = 2;
+                const barrelLength = 20 + level * 0.2;
+                const barrelWidth = 8 + level * 0.1;
+                ctx.fillRect(0, -barrelWidth / 2, barrelLength, barrelWidth);
+                ctx.strokeRect(0, -barrelWidth / 2, barrelLength, barrelWidth);
+                ctx.restore();
+
+                ctx.restore();
+
+                // HP Bar
+                 drawHealthBar(x, y, size, mob.currentHp, mob.maxHp, '#ff6347', '#c62828');
+
+                 // Level Indicator
+                 ctx.fillStyle = '#FFFFFF';
+                 ctx.font = 'bold 11px Inter, sans-serif';
+                 ctx.textAlign = 'center';
+                 ctx.shadowColor = 'rgba(0, 0, 0, 0.7)'; ctx.shadowBlur = 2; ctx.shadowOffsetX=1; ctx.shadowOffsetY=1;
+                 ctx.fillText(`Рів ${level}`, x, y + size * 0.7 + 10);
+                 ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX=0; ctx.shadowOffsetY=0;
+
+                 // Hit Flash
+                 if (mob.hitFlashTimer > 0) {
+                     const flashProgress = mob.hitFlashTimer / 150;
+                     const flashRadius = size * 0.6 * (1 - flashProgress);
+                     ctx.fillStyle = `rgba(255, 255, 255, ${flashProgress * 0.7})`;
+                     ctx.beginPath(); ctx.arc(x, y, flashRadius, 0, Math.PI * 2); ctx.fill();
+                 }
+            });
+        }
+
+        function drawBullets(bullets) {
+             bullets.forEach(bullet => {
+                 const radius = bullet.radius || 5;
+                 ctx.fillStyle = bullet.color || '#FFFFFF';
+                 ctx.strokeStyle = bullet.outline || '#AAAAAA';
+                 ctx.lineWidth = 1.5;
+
+                 ctx.beginPath();
+                 ctx.arc(bullet.x, bullet.y, radius, 0, Math.PI * 2);
+                 ctx.fill();
+
+                 // Subtle glow effect
+                 ctx.shadowColor = bullet.color || '#FFFFFF';
+                 ctx.shadowBlur = 5;
+                 ctx.stroke();
+                 ctx.shadowColor = 'transparent';
+                 ctx.shadowBlur = 0;
+
+                 // Simple trail effect
+                 const trailLength = 3;
+                 const trailSpacing = 5;
+                 const speedMag = Math.hypot(bullet.vx, bullet.vy);
+                 if (speedMag > 0.1) {
+                     const trailVx = (bullet.vx / speedMag) * trailSpacing;
+                     const trailVy = (bullet.vy / speedMag) * trailSpacing;
+                     for (let i = 1; i <= trailLength; i++) {
+                         const trailX = bullet.x - trailVx * i;
+                         const trailY = bullet.y - trailVy * i;
+                         const alpha = 0.4 * (1 - (i / (trailLength + 1)));
+                         const trailRadius = radius * (1 - i * 0.2);
+                         if (trailRadius < 1) break;
+                         const trailColorRgb = hexToRgb(bullet.color || '#FFFFFF');
+                         ctx.fillStyle = `rgba(${trailColorRgb}, ${alpha})`;
+                         ctx.beginPath();
+                         ctx.arc(trailX, trailY, trailRadius, 0, Math.PI * 2);
+                         ctx.fill();
+                     }
+                 }
+             });
+        }
+
+
+        function drawExplosions(timeStep) {
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                const explosion = explosions[i];
+                if (!explosion.initialDuration) explosion.initialDuration = explosion.duration;
+
+                const progress = Math.max(0, 1 - (explosion.duration / explosion.initialDuration));
+                const currentRadius = lerp(0, explosion.maxRadius, Math.sqrt(progress));
+                const currentOpacity = 1 - progress * progress;
+
+                const color = explosion.color || '255,165,0';
+
+                // Core glow
+                const gradient = ctx.createRadialGradient(explosion.x, explosion.y, 0, explosion.x, explosion.y, currentRadius);
+                gradient.addColorStop(0, `rgba(${color}, ${currentOpacity * 0.8})`);
+                gradient.addColorStop(0.7, `rgba(${color}, ${currentOpacity * 0.3})`);
+                gradient.addColorStop(1, `rgba(${color}, 0)`);
+                ctx.fillStyle = gradient;
+                ctx.beginPath(); ctx.arc(explosion.x, explosion.y, currentRadius, 0, Math.PI * 2); ctx.fill();
+
+                // Shockwave ring
+                if (progress < 0.5) {
+                     const shockwaveRadius = currentRadius * 0.8;
+                     const shockwaveOpacity = (1 - progress * 2) * 0.5;
+                     ctx.strokeStyle = `rgba(255, 255, 255, ${shockwaveOpacity})`;
+                     ctx.lineWidth = 2 * (1 - progress * 2);
+                     ctx.beginPath(); ctx.arc(explosion.x, explosion.y, shockwaveRadius, 0, Math.PI * 2); ctx.stroke();
+                }
+
+
+                // Particle simulation
+                if (!explosion.particles) {
+                    explosion.particles = [];
+                    const numParticles = 8 + Math.floor(explosion.maxRadius / 5);
+                    for (let j = 0; j < numParticles; j++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = explosion.maxRadius * (0.02 + Math.random() * 0.05);
+                        explosion.particles.push({
+                            x: explosion.x, y: explosion.y,
+                            vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                            life: explosion.initialDuration * (0.6 + Math.random() * 0.4),
+                            initialLife: explosion.initialDuration * (0.6 + Math.random() * 0.4),
+                            size: 1 + Math.random() * 2
+                        });
+                    }
+                }
+
+                ctx.fillStyle = `rgba(${color}, ${currentOpacity * 0.9})`;
+                explosion.particles.forEach(p => {
+                    p.x += p.vx * (timeStep / 16.67);
+                    p.y += p.vy * (timeStep / 16.67);
+                    p.vx *= 0.96;
+                    p.vy *= 0.96;
+                    p.life -= timeStep;
+                    const lifeProgress = Math.max(0, p.life / p.initialLife);
+                    const particleSize = p.size * lifeProgress;
+
+                    if (p.life > 0 && particleSize > 0.5) {
+                        ctx.globalAlpha = lifeProgress * 0.8;
+                        ctx.beginPath(); ctx.arc(p.x, p.y, particleSize, 0, Math.PI * 2); ctx.fill();
+                    }
+                });
+                 ctx.globalAlpha = 1;
+                 explosion.particles = explosion.particles.filter(p => p.life > 0);
+
+
+                explosion.duration -= timeStep;
+                if (explosion.duration <= 0) {
+                    explosions.splice(i, 1);
+                }
+            }
+        }
+
+        // Expects color in 'R,G,B' string format
+        function createExplosion(x, y, radius, color = '255,165,0', durationMs = 300) {
+            explosions.push({
+                x: x, y: y,
+                maxRadius: radius,
+                color: color,
+                initialDuration: durationMs,
+                duration: durationMs
+            });
+        }
+
+        // --- Main Game Loop ---
+        function gameLoop(currentTime) {
+            if (!lastTime) lastTime = currentTime;
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            accumulatedTime += Math.min(deltaTime, 100);
+
+            // Fixed timestep physics updates
+            while (accumulatedTime >= timeStep) {
+                if (!isClassMenuOpen) {
+                    // Update player state if alive
+                    if (playerTank && !playerTank.isDead) {
+                        updatePlayerTankPosition(timeStep);
+                        updatePlayerTankRotation(timeStep);
+                        updatePlayerBullets(timeStep);
+                        regenerateHealth();
+                        if (playerTank.autoShoot || keys.mouseDown) {
+                            playerShoot();
+                        }
+                    }
+                    // Update AI, Mobs, Shapes, Bullets
+                    updateMobsAI(currentTime);
+                    updateMobsPhysics(currentTime, timeStep);
+                    updateMobBullets(timeStep);
+                    updateShapePhysics(currentTime, timeStep);
+
+                    // Check collisions
+                    checkCollisions();
+                }
+                // Update visual effects timers
+                updateEffects(timeStep);
+                accumulatedTime -= timeStep;
+            }
+
+            // --- Rendering ---
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            drawShapes(currentTime, deltaTime);
+            drawMobs();
+            drawPlayerTank();
+            drawBullets(mobBullets);
+            drawBullets(playerBullets);
+            drawExplosions(deltaTime);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Event Listeners ---
+        function setupEventListeners() {
+            window.addEventListener('keydown', (event) => {
+                const key = event.key.toLowerCase();
+                // Auto-fire toggle
+                if (key === 'e') {
+                    if (playerTank && !playerTank.isDead) {
+                        playerTank.autoShoot = !playerTank.autoShoot;
+                        updateUI();
+                    }
+                    event.preventDefault();
+                }
+                // Movement and Upgrades
+                else if (!isClassMenuOpen && playerTank && !playerTank.isDead) {
+                    if (keys.hasOwnProperty(key)) keys[key] = true;
+                    if (event.key === 'ArrowUp') keys.arrowUp = true;
+                    if (event.key === 'ArrowDown') keys.arrowDown = true;
+                    if (event.key === 'ArrowLeft') keys.arrowLeft = true;
+                    if (event.key === 'ArrowRight') keys.arrowRight = true;
+
+                    // Upgrade hotkeys
+                    const statKeys = ['1', '2', '3', '4', '5', '6', '7', '8'];
+                    const statNames = ['regen', 'maxHealth', 'bodyDamage', 'bulletSpeed', 'penetration', 'damage', 'reload', 'moveSpeed'];
+                    const keyIndex = statKeys.indexOf(event.key);
+                    if (keyIndex !== -1) {
+                        applyUpgrade(statNames[keyIndex]);
+                        event.preventDefault();
+                    }
+                }
+                // Class Selection
+                else if (isClassMenuOpen) {
+                    const classKeys = ['2', '3', '4', '5'];
+                    const classDataNames = ['Twin', 'Sniper', 'Machine Gun', 'Flank Guard'];
+                    const keyIndex = classKeys.indexOf(event.key);
+                    if (keyIndex !== -1) {
+                        selectClass(classDataNames[keyIndex]);
+                        event.preventDefault();
+                    }
+                }
+                 // Close menus with Escape
+                 if (key === 'escape') {
+                     if (isClassMenuOpen) hideClassMenu();
+                 }
+                  // Debug: Open class menu with 'k'
+                 if (key === 'k' && !isClassMenuOpen && playerTank && !playerTank.isDead) {
+                      showClassMenu();
+                 }
+            });
+
+            window.addEventListener('keyup', (event) => {
+                 const key = event.key.toLowerCase();
+                 if (keys.hasOwnProperty(key)) keys[key] = false;
+                 if (event.key === 'ArrowUp') keys.arrowUp = false;
+                 if (event.key === 'ArrowDown') keys.arrowDown = false;
+                 if (event.key === 'ArrowLeft') keys.arrowLeft = false;
+                 if (event.key === 'ArrowRight') keys.arrowRight = false;
+            });
+
+            canvas.addEventListener('mousemove', (event) => {
+                const rect = canvas.getBoundingClientRect();
+                mouseX = event.clientX - rect.left;
+                mouseY = event.clientY - rect.top;
+            });
+
+            canvas.addEventListener('mousedown', (event) => {
+                if (event.button === 0 && !isClassMenuOpen && playerTank && !playerTank.isDead) {
+                    keys.mouseDown = true;
+                    playerShoot();
+                }
+            });
+
+            canvas.addEventListener('mouseup', (event) => {
+                if (event.button === 0) {
+                    keys.mouseDown = false;
+                }
+            });
+
+            // Prevent context menu on canvas
+            canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+
+            // Class menu click listeners
+            classOptions.forEach(option => {
+                option.addEventListener('click', () => selectClass(option.getAttribute('data-class')));
+            });
+
+
+            // Restart button listener
+            if (restartButton) {
+                restartButton.addEventListener('click', restartGame);
+            } else { console.error("Кнопка перезапуску не знайдена!"); }
+
+            // Resize listener
+            window.addEventListener('resize', handleResize);
+        }
+
+        function handleResize() {
+             const w = window.innerWidth;
+             const h = window.innerHeight;
+             const aspectRatio = 16 / 9;
+             let newWidth = w * 0.9;
+             let newHeight = h * 0.9;
+
+             // Maintain aspect ratio
+             if (newWidth / newHeight > aspectRatio) {
+                 newWidth = newHeight * aspectRatio;
+             } else {
+                 newHeight = newWidth / aspectRatio;
+             }
+
+             canvas.width = newWidth;
+             canvas.height = newHeight;
+
+             // Re-clamp player position
+             if (playerTank && !playerTank.isDead) {
+                 const halfSize = playerTankSize / 2;
+                 playerTank.position.x = clamp(playerTank.position.x, halfSize, canvas.width - halfSize);
+                 playerTank.position.y = clamp(playerTank.position.y, halfSize, canvas.height - halfSize);
+             }
+        }
+
+        // --- Initialization ---
+        function initGame() {
+            console.log("Ініціалізація гри...");
+             handleResize();
+             restartGame();
+             setupEventListeners();
+             lastTime = performance.now();
+             requestAnimationFrame(gameLoop);
+             console.log("Гру ініціалізовано та запущено.");
+        }
+
+        // Start the game when the window loads
+        window.onload = initGame;
+
+    </script>
+
+<!-- === SOCKET.IO ADAPTER ======================================= -->
+<script>
+const socket = io();
+let selfId=null, net=null;
+
+// init & snapshots
+socket.on('init', d=>{ selfId=d.selfId; net=d.world; });
+socket.on('snapshot', w=> net=w);
+
+// input
+const keys={};
+window.addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);
+window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+setInterval(()=>socket.emit('input',keys),16);
+
+const cvs=document.getElementById('gameCanvas')||document.querySelector('canvas');
+cvs.addEventListener('mousemove',e=>{
+  const r=cvs.getBoundingClientRect();
+  keys.mouseA=Math.atan2(e.clientY-r.top-cvs.height/2,e.clientX-r.left-cvs.width/2);
+});
+cvs.addEventListener('mousedown',()=>socket.emit('shoot',keys.mouseA||0));
+window.addEventListener('keypress',e=>{if(e.key==='r')socket.emit('respawn');});
+
+// disable local sim
+window.updateGameObjects=()=>{};
+window.generateShapes=()=>{};
+window.spawnMob=()=>{};
+
+// map arrays
+Object.defineProperties(window,{
+  shapes:{get:()=>net?net.shapes:[]},
+  mobs:{get:()=>net?net.mobs:[]},
+  playerBullets:{get:()=>net?net.bullets:[]}
+});
+
+// render loop
+function netLoop(){
+  requestAnimationFrame(netLoop);
+  if(!net) return;
+  const ctx=cvs.getContext('2d');
+  ctx.clearRect(0,0,cvs.width,cvs.height);
+
+  net.shapes.forEach(s=>{
+    ctx.fillStyle={square:'#ffeb3b',triangle:'#f44336',pentagon:'#3f51b5'}[s.type]||'#777';
+    ctx.beginPath();ctx.arc(s.x,s.y,s.size,0,Math.PI*2);ctx.fill();
+  });
+  net.bullets.forEach(b=>{
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(b.x,b.y,4,0,Math.PI*2);ctx.fill();
+  });
+  if(typeof drawTank==='function'){
+    Object.values(net.players).forEach(p=>{
+      drawTank(p, p.id===selfId?'#00e0ff':'#18ffff');
+    });
+  }
+}
+requestAnimationFrame(netLoop);
+</script>
+<!-- ============ END ADAPTER ===================================== -->
+
+</body>
+</html>
